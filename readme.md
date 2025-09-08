@@ -26,3 +26,18 @@ Alternatively you can use the `format` command to turn a json into a different o
 ```sh
 npx -p github:Fuzzyma/e18e-tools format json-output.json -f md -n 100
 ```
+
+Flags:
+
+- -U, --url - CouchDB URL (required)
+- -u, --user / -p, --password - CouchDB Basic auth
+- -n, --number - how many results to print
+- -o, --output - ci | md | json (default: ci)
+- -f, --file - write full results to a JSON file
+- -e, --exclude - comma-separated substrings to exclude
+- -D, --dev - use devDependencies
+- -l, --list - print names only (one per line)
+- -d, --depths - recursion depth (0 = no recursion)
+- -r, --recursive - expand top N per level when recursing
+- -a, --accumulate - accumulate downloads across subtrees
+- -q, --quiet - suppress package info and progress
