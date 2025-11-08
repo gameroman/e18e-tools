@@ -2,8 +2,8 @@
   "name": "e18e-tools",
   "type": "module",
   "dependencies": {
+    "nanospinner": "^1.2.2",
     "picocolors": "^1.1.1",
-    "picospinner": "^2.0.0",
     "semver": "^7.6.3",
     "tsx": "^4.19.2",
     "yargs": "^17.7.2"

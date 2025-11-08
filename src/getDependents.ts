@@ -6,7 +6,7 @@ import * as readline from "readline";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { fetchWithProgress } from "./utils/fetch-with-progress.ts";
-import { Spinner } from "picospinner";
+import { createSpinner } from "nanospinner";
 import semver from "semver";
 import { escapeMdTable } from "./utils/escape-md-table.ts";
 
@@ -198,7 +198,7 @@ async function fetchDependents(
   const deps = dev ? "dev-dependencies" : "dependents2";
   const url = `${localCouchdbUrl}/_design/dependents/_view/${deps}?key="${packageName}"`;
 
-  const spinner = new Spinner("Fetching dependent packages...");
+  const spinner = createSpinner("Fetching dependent packages...");
 
   if (!quiet) {
     spinner.start();
@@ -226,7 +226,7 @@ async function fetchDependents(
     | LocalDependendsResponseProd;
 
   if (!quiet) {
-    spinner.succeed(
+    spinner.success(
       pc.bold(pc.cyan(`Fetched ${data.rows.length} dependents.`))
     );
   }
@@ -253,7 +253,7 @@ async function fetchDownloadStats(packageNames: string[], quiet = false) {
     rows: { id: string; key: string; value: number }[];
   };
 
-  let spinner = quiet ? null : new Spinner("Fetching download stats...");
+  let spinner = quiet ? null : createSpinner("Fetching download stats...");
   spinner?.start();
 
   const sizes = packageNames.map(
