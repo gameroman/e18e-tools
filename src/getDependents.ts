@@ -9,8 +9,9 @@ import { createSpinner } from "nanospinner";
 import semver from "semver";
 import { escapeMdTable } from "./utils/escape-md-table.ts";
 
-const cli = sade("npx github:Fuzzyma/e18e-tools", true)
-  .version("unknown")
+let argv;
+
+const cli = sade("e18e-tools [pkg]", true)
   .option("--number, -n", "Number of dependents printed to stdout", Infinity)
   .option("--file, -f", "Write results as json to the specified file")
   .option("--output, -o", `Output format (choices: "md", "ci", "json")`, "ci")
@@ -24,9 +25,8 @@ const cli = sade("npx github:Fuzzyma/e18e-tools", true)
   .option("--user, -u", "CouchDB user")
   .option("--password, -p", "CouchDB password")
   .option("--url, -U", "CouchDB URL")
-  .action(() => {})
+  .action((pkg, opts) => (argv = { pkg, ...opts }))
   .parse(process.argv, {
-    lazy: true,
     string: [
       // number
       "number", "recursive", "depths",
@@ -36,12 +36,11 @@ const cli = sade("npx github:Fuzzyma/e18e-tools", true)
     boolean: ["dev", "list", "accumulate", "quiet"],
   });
 
-// If we show help (--help)
-if (!cli) {
+// If we don't run the app (e.g. just show help or version),
+// we can just exit it gracefully.
+if (!argv) {
   process.exit(0);
 }
-
-const argv = cli.args[0];
 
 const npmRegistryBaseUrl = "https://registry.npmmirror.com";
 const localCouchdbUrl = argv.url;
@@ -491,7 +490,7 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
   }
 }
 
-const inputPackage = argv._[0] as string;
+const inputPackage = argv.pkg;
 
 if (!inputPackage) {
   console.error(pc.red("Please provide a package name as the first argument."));
