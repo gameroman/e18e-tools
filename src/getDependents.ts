@@ -9,7 +9,7 @@ import { createSpinner } from "nanospinner";
 import semver from "semver";
 import { escapeMdTable } from "./utils/escape-md-table.ts";
 
-const cli = sade("e18e-tools", true)
+const cli = sade("npx github:Fuzzyma/e18e-tools", true)
   .version("unknown")
   .option("--number, -n", "Number of dependents printed to stdout", Infinity)
   .option("--file, -f", "Write results as json to the specified file")
