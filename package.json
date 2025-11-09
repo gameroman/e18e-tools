@@ -4,9 +4,9 @@
   "dependencies": {
     "nanospinner": "^1.2.2",
     "picocolors": "^1.1.1",
+    "sade": "^1.8.1",
     "semver": "^7.6.3",
-    "tsx": "^4.19.2",
-    "yargs": "^17.7.2"
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
