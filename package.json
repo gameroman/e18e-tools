@@ -1,25 +1,24 @@
 {
   "name": "e18e-tools",
-  "type": "module",
-  "dependencies": {
-    "picocolors": "^1.1.1",
-    "picospinner": "^2.0.0",
-    "semver": "^7.6.3",
-    "tsx": "^4.19.2",
-    "yargs": "^17.7.2"
-  },
-  "devDependencies": {
-    "@types/node": "^22.9.0",
-    "@types/semver": "^7.5.8",
-    "@types/yargs": "^17.0.33"
-  },
   "bin": {
     "e18e-tools": "./src/getDependents.ts",
     "format": "./src/format.ts"
   },
+  "type": "module",
   "scripts": {
     "get": "bun ./src/getDependents.ts -U http://localhost:5984/registry2 -u admin -p admin",
     "format": "bun ./src/format.ts",
     "test": "bun ./src/getDependents.ts svg.js -U http://localhost:5984/registry2 -u admin -p admin"
+  },
+  "dependencies": {
+    "picocolors": "^1.1.1",
+    "picospinner": "^3.0.0",
+    "semver": "^7.7.4",
+    "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.9",
+    "@types/semver": "^7.7.1",
+    "@types/yargs": "^17.0.35"
   }
 }

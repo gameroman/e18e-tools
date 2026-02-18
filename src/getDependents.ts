@@ -1,14 +1,14 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 
-import fs from "fs/promises";
+import fs from "node:fs/promises";
 import pc from "picocolors";
-import * as readline from "readline";
+import * as readline from "node:readline";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { fetchWithProgress } from "./utils/fetch-with-progress.ts";
+import { fetchWithProgress } from "./utils/fetch-with-progress";
 import { Spinner } from "picospinner";
 import semver from "semver";
-import { escapeMdTable } from "./utils/escape-md-table.ts";
+import { escapeMdTable } from "./utils/escape-md-table";
 
 const argv = await yargs(hideBin(process.argv))
   .option("number", {
@@ -174,7 +174,7 @@ function formatTraffic(bytes: number): string {
 
 async function fetchPackageInfo(
   packageName: string,
-  version = "latest"
+  version = "latest",
 ): Promise<NpmPackageInfo | null> {
   const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
   try {
@@ -193,7 +193,7 @@ async function fetchPackageInfo(
 async function fetchDependents(
   packageName: string,
   dev = false,
-  quiet = false
+  quiet = false,
 ) {
   const deps = dev ? "dev-dependencies" : "dependents2";
   const url = `${localCouchdbUrl}/_design/dependents/_view/${deps}?key="${packageName}"`;
@@ -214,8 +214,8 @@ async function fetchDependents(
     if (response.status === 401) {
       console.error(
         pc.red(
-          `Please supply username and password with --user and --password.`
-        )
+          `Please supply username and password with --user and --password.`,
+        ),
       );
     }
     throw new Error(`HTTP error! Status: ${response.status}`);
@@ -227,7 +227,7 @@ async function fetchDependents(
 
   if (!quiet) {
     spinner.succeed(
-      pc.bold(pc.cyan(`Fetched ${data.rows.length} dependents.`))
+      pc.bold(pc.cyan(`Fetched ${data.rows.length} dependents.`)),
     );
   }
 
@@ -257,7 +257,7 @@ async function fetchDownloadStats(packageNames: string[], quiet = false) {
   spinner?.start();
 
   const sizes = packageNames.map(
-    (name) => `{ "id": "${name}", "key": "${name}", "value": 00000000 }`.length
+    (name) => `{ "id": "${name}", "key": "${name}", "value": 00000000 }`.length,
   );
   const totalSizes = sizes.reduce((a, b) => a + b, 0);
   const overhead = `{total_rows: 00000, offset: 0000, rows: []}`.length;
@@ -280,10 +280,10 @@ async function fetchDownloadStats(packageNames: string[], quiet = false) {
             showProgress(
               curr,
               total,
-              `Fetching download stats for ${packageNames.length} packages`
+              `Fetching download stats for ${packageNames.length} packages`,
             );
           },
-    }
+    },
   );
 
   const docs = response.rows.map((row) => [row.key, row.value]);
@@ -297,19 +297,19 @@ function showProgress(current: number, total: number, message: string): void {
   readline.cursorTo(process.stdout, 0);
   process.stdout.write(
     `${pc.cyan(
-      `[${"=".repeat(percentage / 5)}${" ".repeat(20 - percentage / 5)}]`
-    )} ${percentage}% - ${message}`
+      `[${"=".repeat(percentage / 5)}${" ".repeat(20 - percentage / 5)}]`,
+    )} ${percentage}% - ${message}`,
   );
 }
 
 const getnameAndVersion = (
-  inputPackage: string
+  inputPackage: string,
 ): [string, string | undefined] => {
   const scoped = inputPackage.startsWith("@");
 
   let [packageName, version] = inputPackage.split("@") as [
     string,
-    string | undefined
+    string | undefined,
   ];
 
   if (scoped) {
@@ -347,24 +347,24 @@ function printOutput(results: Results[], spaces = "") {
   const trafficFormatted = results.map((p) => formatTraffic(p.traffic));
   const maxDownloadsWidth = downloadsFormatted.reduce(
     (a, b) => Math.max(a, b.length),
-    0
+    0,
   );
   const maxTrafficWidth = trafficFormatted.reduce(
     (a, b) => Math.max(a, b.length),
-    0
+    0,
   );
 
   const maxNameWidth = results.reduce((a, b) => Math.max(a, b.name.length), 0);
 
   const maxVersionWidth = Math.min(
     results.reduce((a, b) => Math.max(a, b.version.length), 0),
-    16
+    16,
   );
 
   results.forEach((pkg, index) => {
     const indexStr = `${index + 1}`.padEnd(maxIndexWidth);
     const downloadsStr = formatDownloads(pkg.downloads).padStart(
-      maxDownloadsWidth
+      maxDownloadsWidth,
     );
     const trafficStr = pkg.traffic
       ? formatTraffic(pkg.traffic).padStart(maxTrafficWidth)
@@ -375,14 +375,14 @@ function printOutput(results: Results[], spaces = "") {
 
     if (argv.output === "md") {
       console.log(
-        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmjs.com/${pkg.name}) |`
+        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmjs.com/${pkg.name}) |`,
       );
     } else {
       console.log(
         spaces,
         `${pc.green(`#${indexStr}`)} ${pc.magenta(downloadsStr)} ⬇️ , ${pc.red(
-          trafficStr
-        )} - ${pc.yellow(nameStr)} ${pc.blue(versionStr)} ${npmLink}`
+          trafficStr,
+        )} - ${pc.yellow(nameStr)} ${pc.blue(versionStr)} ${npmLink}`,
       );
 
       if (pkg.children.length > 0) {
@@ -421,20 +421,16 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
   if (!argv.list && !quiet) {
     console.log(pc.bold(pc.cyan("Package Info:")));
     console.log(
-      `${pc.green("Name:")} ${pc.yellow(packageInfo.name)} (${pc.magenta(
-        actualVersion
-      )})\n` +
+      `${pc.green("Name:")} ${pc.yellow(packageInfo.name)} (${pc.magenta(actualVersion)})\n` +
         `${pc.green("Homepage:")} ${pc.blue(homepage)}\n` +
-        `${pc.green("Unpacked Size:")} ${pc.yellow(
-          formatTraffic(packageInfo.dist?.size ?? 0)
-        )}`
+        `${pc.green("Unpacked Size:")} ${pc.yellow(formatTraffic(packageInfo.dist?.size ?? 0))}`,
     );
   }
 
   const dependentsWithVersion = await fetchDependents(
     packageName,
     argv.dev,
-    quiet || argv.list
+    quiet || argv.list,
   );
 
   const dependents = dependentsWithVersion.filter((dependent) => {
@@ -453,7 +449,7 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
 
   const downloadStats = await fetchDownloadStats(
     dependents.map((p) => p.value.name),
-    quiet
+    quiet,
   );
 
   const results = dependents.map((dep): Results => {
@@ -487,7 +483,7 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
           const recursiveResults = await main(r.name, depths - 1, true);
           r.children = recursiveResults!;
           return r;
-        })
+        }),
     );
   }
 
@@ -518,13 +514,13 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
       JSON.stringify(
         topResults.filter(filterExcludes).slice(0, argv.number),
         null,
-        2
-      )
+        2,
+      ),
     );
   } else {
     if (argv.output === "md") {
       console.log(
-        `| # | Downloads | Traffic | Version | Package |\n|---|---|---|---|---|`
+        `| # | Downloads | Traffic | Version | Package |\n|---|---|---|---|---|`,
       );
     }
 

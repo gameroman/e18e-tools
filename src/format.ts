@@ -4,7 +4,7 @@ import pc from "picocolors";
 import fs from "fs";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { escapeMdTable } from "./utils/escape-md-table.ts";
+import { escapeMdTable } from "./utils/escape-md-table";
 
 const argv = await yargs(hideBin(process.argv))
   .option("format", {
@@ -70,32 +70,32 @@ async function main() {
   const maxIndexWidth = topResults.length.toString().length; // Width for indices
 
   const downloadsFormatted = topResults.map((p) =>
-    formatDownloads(p.downloads)
+    formatDownloads(p.downloads),
   );
   const trafficFormatted = topResults.map((p) => formatTraffic(p.traffic ?? 0));
   const maxDownloadsWidth = downloadsFormatted.reduce(
     (a, b) => Math.max(a, b.length),
-    0
+    0,
   );
   const maxTrafficWidth = trafficFormatted.reduce(
     (a, b) => Math.max(a, b.length),
-    0
+    0,
   );
 
   const maxNameWidth = topResults.reduce(
     (a, b) => Math.max(a, b.name.length),
-    0
+    0,
   );
 
   const maxVersionWidth = Math.min(
     topResults.reduce((a, b) => Math.max(a, b.version.length), 0),
-    16
+    16,
   );
 
   topResults.slice(0, argv.number).forEach((pkg, index) => {
     const indexStr = `${index + 1}`.padEnd(maxIndexWidth);
     const downloadsStr = formatDownloads(pkg.downloads).padStart(
-      maxDownloadsWidth
+      maxDownloadsWidth,
     );
     const trafficStr = pkg.traffic
       ? formatTraffic(pkg.traffic).padStart(maxTrafficWidth)
@@ -106,13 +106,13 @@ async function main() {
 
     if (argv.format === "md") {
       console.log(
-        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmjs.com/${pkg.name}) |`
+        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmjs.com/${pkg.name}) |`,
       );
     } else {
       console.log(
         `${pc.green(`#${indexStr}`)} ${pc.magenta(downloadsStr)} ⬇️ , ${pc.red(
-          trafficStr
-        )} - ${pc.yellow(nameStr)} ${npmLink}`
+          trafficStr,
+        )} - ${pc.yellow(nameStr)} ${npmLink}`,
       );
     }
   });

@@ -1,4 +1,4 @@
-import assert from "assert";
+import assert from "node:assert";
 
 type FetchOptions = Parameters<typeof fetch>[1];
 
@@ -6,7 +6,7 @@ export async function fetchWithProgress<T = unknown>(
   url: string,
   options: FetchOptions & {
     onProgress?: (curr: number, total: number) => void;
-  }
+  },
 ) {
   const { onProgress, ...fetchOptions } = options;
 
