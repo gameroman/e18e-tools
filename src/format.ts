@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import pc from "picocolors";
-import fs from "fs";
+import fs from "node:fs";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { escapeMdTable } from "./utils/escape-md-table";
@@ -102,11 +102,11 @@ async function main() {
       : "".padStart(maxTrafficWidth);
     const nameStr = pkg.name.padEnd(maxNameWidth);
     const versionStr = pkg.version.slice(0, 16).padEnd(maxVersionWidth);
-    const npmLink = `https://npmjs.com/${pkg.name}`;
+    const npmLink = `https://npmx.dev/${pkg.name}`;
 
     if (argv.format === "md") {
       console.log(
-        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmjs.com/${pkg.name}) |`,
+        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](${npmLink}) |`,
       );
     } else {
       console.log(
