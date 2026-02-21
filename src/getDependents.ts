@@ -371,11 +371,11 @@ function printOutput(results: Results[], spaces = "") {
       : "".padStart(maxTrafficWidth);
     const nameStr = pkg.name.padEnd(maxNameWidth);
     const versionStr = pkg.version.slice(0, 16).padEnd(maxVersionWidth);
-    const npmLink = `https://npmjs.com/${pkg.name}`;
+    const npmLink = `https://npmx.dev/${pkg.name}`;
 
     if (argv.output === "md") {
       console.log(
-        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmjs.com/${pkg.name}) |`
+        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmx.dev/${pkg.name}) |`
       );
     } else {
       console.log(
