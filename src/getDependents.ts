@@ -3,86 +3,44 @@
 import fs from "fs/promises";
 import pc from "picocolors";
 import * as readline from "readline";
-import yargs from "yargs";
-import { hideBin } from "yargs/helpers";
+import sade from "sade";
 import { fetchWithProgress } from "./utils/fetch-with-progress.ts";
-import { Spinner } from "picospinner";
+import { createSpinner } from "nanospinner";
 import semver from "semver";
 import { escapeMdTable } from "./utils/escape-md-table.ts";
 
-const argv = await yargs(hideBin(process.argv))
-  .option("number", {
-    alias: "n",
-    type: "number",
-    description: "Number of dependents printed to stdout",
-    default: Infinity,
-  })
-  .option("file", {
-    alias: "f",
-    description: "Write results as json to the specified file",
-    type: "string",
-  })
-  .option("output", {
-    alias: "o",
-    description: "Output format",
-    type: "string",
-    default: "ci",
-    choices: ["md", "ci", "json"],
-  })
-  .option("exclude", {
-    alias: "e",
-    description:
-      "Exclude packages that include the specified string (can be comma separated)",
-    type: "string",
-  })
-  .option("dev", {
-    alias: "D",
-    description: "Use devDependencies",
-    type: "boolean",
-  })
-  .option("list", {
-    alias: "l",
-    description: "Only prints dependents as list to pipe into other commands",
-    type: "boolean",
-  })
-  .option("recursive", {
-    alias: "r",
-    description: "Gets x dependents recursively and prints sub tables",
-    type: "number",
-    default: 3,
-  })
-  .option("depths", {
-    alias: "d",
-    description: "Number of recursion steps",
-    type: "number",
-    default: 0,
-  })
-  .option("accumulate", {
-    alias: "a",
-    description: "Accumulate recursive stats into topmost dependent",
-    type: "boolean",
-  })
-  .option("quiet", {
-    alias: "q",
-    description: "Supress Package Info",
-    type: "boolean",
-  })
-  .option("user", {
-    alias: "u",
-    description: "CouchDB user",
-    type: "string",
-  })
-  .option("password", {
-    alias: "p",
-    description: "CouchDB password",
-    type: "string",
-  })
-  .option("url", {
-    alias: "U",
-    description: "CouchDB URL",
-    type: "string",
-  })
-  .help().argv;
+let argv;
+
+const cli = sade("e18e-tools [pkg]", true)
+  .option("--number, -n", "Number of dependents printed to stdout", Infinity)
+  .option("--file, -f", "Write results as json to the specified file")
+  .option("--output, -o", `Output format (choices: "md", "ci", "json")`, "ci")
+  .option("--exclude, -e", "Exclude packages that include the specified string (can be comma separated)")
+  .option("--dev, -D", "Use devDependencies")
+  .option("--list, -l", "Only prints dependents as list to pipe into other commands")
+  .option("--recursive, -r", "Gets x dependents recursively and prints sub tables", 3)
+  .option("--depths, -d", "Number of recursion steps", 0)
+  .option("--accumulate, -a", "Accumulate recursive stats into topmost dependent")
+  .option("--quiet, -q", "Supress Package Info")
+  .option("--user, -u", "CouchDB user")
+  .option("--password, -p", "CouchDB password")
+  .option("--url, -U", "CouchDB URL")
+  .action((pkg, opts) => (argv = { pkg, ...opts }))
+  .parse(process.argv, {
+    string: [
+      // number
+      "number", "recursive", "depths",
+      // string
+      "file", "output", "exclude", "user", "password", "url",
+    ],
+    boolean: ["dev", "list", "accumulate", "quiet"],
+  });
+
+// If we don't run the app (e.g. just show help or version),
+// we can just exit it gracefully.
+if (!argv) {
+  process.exit(0);
+}
 
 const npmRegistryBaseUrl = "https://registry.npmmirror.com";
 const localCouchdbUrl = argv.url;
@@ -198,7 +156,7 @@ async function fetchDependents(
   const deps = dev ? "dev-dependencies" : "dependents2";
   const url = `${localCouchdbUrl}/_design/dependents/_view/${deps}?key="${packageName}"`;
 
-  const spinner = new Spinner("Fetching dependent packages...");
+  const spinner = createSpinner("Fetching dependent packages...");
 
   if (!quiet) {
     spinner.start();
@@ -226,7 +184,7 @@ async function fetchDependents(
     | LocalDependendsResponseProd;
 
   if (!quiet) {
-    spinner.succeed(
+    spinner.success(
       pc.bold(pc.cyan(`Fetched ${data.rows.length} dependents.`))
     );
   }
@@ -253,7 +211,7 @@ async function fetchDownloadStats(packageNames: string[], quiet = false) {
     rows: { id: string; key: string; value: number }[];
   };
 
-  let spinner = quiet ? null : new Spinner("Fetching download stats...");
+  let spinner = quiet ? null : createSpinner("Fetching download stats...");
   spinner?.start();
 
   const sizes = packageNames.map(
@@ -532,7 +490,7 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
   }
 }
 
-const inputPackage = argv._[0] as string;
+const inputPackage = argv.pkg;
 
 if (!inputPackage) {
   console.error(pc.red("Please provide a package name as the first argument."));

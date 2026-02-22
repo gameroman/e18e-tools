@@ -2,25 +2,14 @@
 
 import pc from "picocolors";
 import fs from "fs";
-import yargs from "yargs";
-import { hideBin } from "yargs/helpers";
+import sade from "sade";
 import { escapeMdTable } from "./utils/escape-md-table.ts";
 
-const argv = await yargs(hideBin(process.argv))
-  .option("format", {
-    alias: "f",
-    type: "string",
-    description: "Output format",
-    default: "ci",
-    choices: ["md", "ci"],
-  })
-  .option("number", {
-    alias: "n",
-    type: "number",
-    description: "Number of dependents to display",
-    default: Infinity,
-  })
-  .help().argv;
+const cli = sade("e18e-tools/format [file]", true)
+  .option("--format, -f", `Output format (choices: "md", "ci")`, "ci")
+  .option("--number, -n", "Number of dependents to display", Infinity)
+  .action((file, opts) => main(file, opts).catch(console.error))
+  .parse(process.argv);
 
 interface DependentPackage {
   name: string;
@@ -44,9 +33,7 @@ function formatTraffic(bytes: number): string {
   return `${bytes} bytes`;
 }
 
-async function main() {
-  const fileName = argv._[0] as string;
-
+async function main(fileName: string, opts) {
   if (!fileName) {
     console.error(pc.red("Please provide a filename as the first argument."));
     process.exit(1);
@@ -63,7 +50,7 @@ async function main() {
     process.exit(1);
   }
 
-  if (argv.format === "md") {
+  if (opts.format === "md") {
     console.log(`| # | Downloads | Traffic | Package |\n|---|---|---|---|`);
   }
 
@@ -92,7 +79,7 @@ async function main() {
     16
   );
 
-  topResults.slice(0, argv.number).forEach((pkg, index) => {
+  topResults.slice(0, opts.number).forEach((pkg, index) => {
     const indexStr = `${index + 1}`.padEnd(maxIndexWidth);
     const downloadsStr = formatDownloads(pkg.downloads).padStart(
       maxDownloadsWidth
@@ -104,7 +91,7 @@ async function main() {
     const versionStr = pkg.version.slice(0, 16).padEnd(maxVersionWidth);
     const npmLink = `https://npmx.dev/${pkg.name}`;
 
-    if (argv.format === "md") {
+    if (opts.format === "md") {
       console.log(
         escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmx.dev/${pkg.name}) |`
       );
@@ -117,5 +104,3 @@ async function main() {
     }
   });
 }
-
-main().catch(console.error);
