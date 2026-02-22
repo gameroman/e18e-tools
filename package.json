@@ -2,23 +2,15 @@
   "name": "e18e-tools",
   "type": "module",
   "dependencies": {
-    "nanospinner": "^1.2.2",
     "picocolors": "^1.1.1",
     "sade": "^1.8.1",
-    "semver": "^7.6.3",
-    "tsx": "^4.19.2"
+    "semver": "^7.6.3"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
     "@types/semver": "^7.5.8"
   },
   "bin": {
-    "e18e-tools": "./src/getDependents.ts",
-    "format": "./src/format.ts"
-  },
-  "scripts": {
-    "get": "bun ./src/getDependents.ts -U http://localhost:5984/registry2 -u admin -p admin",
-    "format": "bun ./src/format.ts",
-    "test": "bun ./src/getDependents.ts svg.js -U http://localhost:5984/registry2 -u admin -p admin"
+    "e18e-tools": "./src/index.ts"
   }
 }

@@ -1,39 +1,47 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 
-import fs from "fs/promises";
+import fs from "node:fs/promises";
+import * as readline from "node:readline";
+
 import pc from "picocolors";
-import * as readline from "readline";
 import sade from "sade";
-import { fetchWithProgress } from "./utils/fetch-with-progress.ts";
-import { createSpinner } from "nanospinner";
 import semver from "semver";
-import { escapeMdTable } from "./utils/escape-md-table.ts";
+
+import { fetchWithProgress } from "./utils/fetch-with-progress";
+import { escapeMdTable } from "./utils/escape-md-table";
 
 let argv;
 
-const cli = sade("e18e-tools [pkg]", true)
+sade("e18e-tools [pkg]", true)
   .option("--number, -n", "Number of dependents printed to stdout", Infinity)
   .option("--file, -f", "Write results as json to the specified file")
-  .option("--output, -o", `Output format (choices: "md", "ci", "json")`, "ci")
-  .option("--exclude, -e", "Exclude packages that include the specified string (can be comma separated)")
+  .option(
+    "--exclude, -e",
+    "Exclude packages that include the specified string (can be comma separated)",
+  )
   .option("--dev, -D", "Use devDependencies")
-  .option("--list, -l", "Only prints dependents as list to pipe into other commands")
-  .option("--recursive, -r", "Gets x dependents recursively and prints sub tables", 3)
+  .option(
+    "--list, -l",
+    "Only prints dependents as list to pipe into other commands",
+  )
+  .option(
+    "--recursive, -r",
+    "Gets x dependents recursively and prints sub tables",
+    3,
+  )
   .option("--depths, -d", "Number of recursion steps", 0)
-  .option("--accumulate, -a", "Accumulate recursive stats into topmost dependent")
-  .option("--quiet, -q", "Supress Package Info")
-  .option("--user, -u", "CouchDB user")
-  .option("--password, -p", "CouchDB password")
-  .option("--url, -U", "CouchDB URL")
   .action((pkg, opts) => (argv = { pkg, ...opts }))
   .parse(process.argv, {
     string: [
       // number
-      "number", "recursive", "depths",
+      "number",
+      "recursive",
+      "depths",
       // string
-      "file", "output", "exclude", "user", "password", "url",
+      "file",
+      "exclude",
     ],
-    boolean: ["dev", "list", "accumulate", "quiet"],
+    boolean: ["dev", "list", "accumulate"],
   });
 
 // If we don't run the app (e.g. just show help or version),
@@ -43,7 +51,7 @@ if (!argv) {
 }
 
 const npmRegistryBaseUrl = "https://registry.npmmirror.com";
-const localCouchdbUrl = argv.url;
+const localCouchdbUrl = "https://npm.devminer.xyz/registry";
 
 if (!localCouchdbUrl) {
   console.error(pc.red("Please provide a CouchDB URL."));
@@ -53,13 +61,6 @@ if (!localCouchdbUrl) {
 // const authHeader = "Basic " + Buffer.from("admin:admin").toString("base64");
 
 const getAuthHeaders = (): { Authorization: string } | {} => {
-  if (argv.user && argv.password) {
-    return {
-      Authorization:
-        "Basic " +
-        Buffer.from(`${argv.user}:${argv.password}`).toString("base64"),
-    };
-  }
   return {};
 };
 
@@ -124,15 +125,16 @@ function formatDownloads(downloads: number): string {
 }
 
 function formatTraffic(bytes: number): string {
-  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(2)} GB`;
-  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(2)} MB`;
-  if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(2)} KB`;
+  if (bytes >= 1.5e12) return `${(bytes / 1e12).toFixed(2)} TB`;
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(2)} MB`;
+  if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(2)} KB`;
   return `${bytes} bytes`;
 }
 
 async function fetchPackageInfo(
   packageName: string,
-  version = "latest"
+  version = "latest",
 ): Promise<NpmPackageInfo | null> {
   const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
   try {
@@ -148,46 +150,19 @@ async function fetchPackageInfo(
   }
 }
 
-async function fetchDependents(
-  packageName: string,
-  dev = false,
-  quiet = false
-) {
+async function fetchDependents(packageName: string, dev = false) {
   const deps = dev ? "dev-dependencies" : "dependents2";
   const url = `${localCouchdbUrl}/_design/dependents/_view/${deps}?key="${packageName}"`;
 
-  const spinner = createSpinner("Fetching dependent packages...");
-
-  if (!quiet) {
-    spinner.start();
-  }
-
-  const response = await fetch(url, {
-    headers: {
-      ...getAuthHeaders(),
-    },
-  });
+  const response = await fetch(url);
 
   if (!response.ok) {
-    if (response.status === 401) {
-      console.error(
-        pc.red(
-          `Please supply username and password with --user and --password.`
-        )
-      );
-    }
     throw new Error(`HTTP error! Status: ${response.status}`);
   }
 
   const data = (await response.json()) as
     | LocalDependendsResponseDev
     | LocalDependendsResponseProd;
-
-  if (!quiet) {
-    spinner.success(
-      pc.bold(pc.cyan(`Fetched ${data.rows.length} dependents.`))
-    );
-  }
 
   if (data.rows.length && typeof data.rows[0].value === "string") {
     return data.rows.map((p) => {
@@ -204,22 +179,12 @@ async function fetchDependents(
   return data.rows as LocalDependendsResponseProd["rows"];
 }
 
-async function fetchDownloadStats(packageNames: string[], quiet = false) {
+async function fetchDownloadStats(packageNames: string[]) {
   type Stats = {
     total_rows: number;
     offset: number;
     rows: { id: string; key: string; value: number }[];
   };
-
-  let spinner = quiet ? null : createSpinner("Fetching download stats...");
-  spinner?.start();
-
-  const sizes = packageNames.map(
-    (name) => `{ "id": "${name}", "key": "${name}", "value": 00000000 }`.length
-  );
-  const totalSizes = sizes.reduce((a, b) => a + b, 0);
-  const overhead = `{total_rows: 00000, offset: 0000, rows: []}`.length;
-  const total = (totalSizes + overhead) * 0.88; // Yes this is a really bad approximation based on tests
 
   const response = await fetchWithProgress<Stats>(
     `${localCouchdbUrl}/_design/downloads/_view/downloads`,
@@ -230,18 +195,7 @@ async function fetchDownloadStats(packageNames: string[], quiet = false) {
         ...getAuthHeaders(),
       },
       body: JSON.stringify({ keys: packageNames }),
-      onProgress: quiet
-        ? undefined
-        : (curr) => {
-            spinner?.stop();
-            spinner = null;
-            showProgress(
-              curr,
-              total,
-              `Fetching download stats for ${packageNames.length} packages`
-            );
-          },
-    }
+    },
   );
 
   const docs = response.rows.map((row) => [row.key, row.value]);
@@ -249,25 +203,14 @@ async function fetchDownloadStats(packageNames: string[], quiet = false) {
   return Object.fromEntries(docs);
 }
 
-function showProgress(current: number, total: number, message: string): void {
-  const percentage = Math.min(Math.round((current / total) * 100), 100);
-  readline.clearLine(process.stdout, 0);
-  readline.cursorTo(process.stdout, 0);
-  process.stdout.write(
-    `${pc.cyan(
-      `[${"=".repeat(percentage / 5)}${" ".repeat(20 - percentage / 5)}]`
-    )} ${percentage}% - ${message}`
-  );
-}
-
 const getnameAndVersion = (
-  inputPackage: string
+  inputPackage: string,
 ): [string, string | undefined] => {
   const scoped = inputPackage.startsWith("@");
 
   let [packageName, version] = inputPackage.split("@") as [
     string,
-    string | undefined
+    string | undefined,
   ];
 
   if (scoped) {
@@ -293,7 +236,7 @@ type Results = {
   version: string;
 };
 
-function printOutput(results: Results[], spaces = "") {
+function printOutput(results: Results[]) {
   results = results
     .filter(filterExcludes)
     .slice(0, argv.number)
@@ -305,48 +248,31 @@ function printOutput(results: Results[], spaces = "") {
   const trafficFormatted = results.map((p) => formatTraffic(p.traffic));
   const maxDownloadsWidth = downloadsFormatted.reduce(
     (a, b) => Math.max(a, b.length),
-    0
+    0,
   );
   const maxTrafficWidth = trafficFormatted.reduce(
     (a, b) => Math.max(a, b.length),
-    0
+    0,
   );
-
-  const maxNameWidth = results.reduce((a, b) => Math.max(a, b.name.length), 0);
 
   const maxVersionWidth = Math.min(
     results.reduce((a, b) => Math.max(a, b.version.length), 0),
-    16
+    16,
   );
 
   results.forEach((pkg, index) => {
     const indexStr = `${index + 1}`.padEnd(maxIndexWidth);
     const downloadsStr = formatDownloads(pkg.downloads).padStart(
-      maxDownloadsWidth
+      maxDownloadsWidth,
     );
     const trafficStr = pkg.traffic
       ? formatTraffic(pkg.traffic).padStart(maxTrafficWidth)
       : "".padStart(maxTrafficWidth);
-    const nameStr = pkg.name.padEnd(maxNameWidth);
     const versionStr = pkg.version.slice(0, 16).padEnd(maxVersionWidth);
-    const npmLink = `https://npmx.dev/${pkg.name}`;
 
-    if (argv.output === "md") {
-      console.log(
-        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmx.dev/${pkg.name}) |`
-      );
-    } else {
-      console.log(
-        spaces,
-        `${pc.green(`#${indexStr}`)} ${pc.magenta(downloadsStr)} ⬇️ , ${pc.red(
-          trafficStr
-        )} - ${pc.yellow(nameStr)} ${pc.blue(versionStr)} ${npmLink}`
-      );
-
-      if (pkg.children.length > 0) {
-        printOutput(pkg.children, spaces + "  ");
-      }
-    }
+    console.log(
+      escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmx.dev/${pkg.name}) |`,
+    );
   });
 }
 
@@ -360,7 +286,7 @@ function accumulateStats(result: Results): number {
 const filterExcludes = (pkg: DependentPackage) =>
   argv.exclude?.split(",").every((ex) => !pkg.name.includes(ex)) ?? true;
 
-async function main(inputPackage: string, depths = 0, quiet = false) {
+async function main(inputPackage: string, depths = 0) {
   const [packageName, version] = getnameAndVersion(inputPackage);
 
   const packageInfo = await fetchPackageInfo(packageName, version);
@@ -376,24 +302,16 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
   const actualVersion = packageInfo.version;
   const homepage = packageInfo.homepage || "No homepage found";
 
-  if (!argv.list && !quiet) {
+  if (!argv.list && !true) {
     console.log(pc.bold(pc.cyan("Package Info:")));
     console.log(
-      `${pc.green("Name:")} ${pc.yellow(packageInfo.name)} (${pc.magenta(
-        actualVersion
-      )})\n` +
+      `${pc.green("Name:")} ${pc.yellow(packageInfo.name)} (${pc.magenta(actualVersion)})\n` +
         `${pc.green("Homepage:")} ${pc.blue(homepage)}\n` +
-        `${pc.green("Unpacked Size:")} ${pc.yellow(
-          formatTraffic(packageInfo.dist?.size ?? 0)
-        )}`
+        `${pc.green("Unpacked Size:")} ${pc.yellow(formatTraffic(packageInfo.dist?.size ?? 0))}`,
     );
   }
 
-  const dependentsWithVersion = await fetchDependents(
-    packageName,
-    argv.dev,
-    quiet || argv.list
-  );
+  const dependentsWithVersion = await fetchDependents(packageName, argv.dev);
 
   const dependents = dependentsWithVersion.filter((dependent) => {
     return (
@@ -411,7 +329,6 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
 
   const downloadStats = await fetchDownloadStats(
     dependents.map((p) => p.value.name),
-    quiet
   );
 
   const results = dependents.map((dep): Results => {
@@ -428,7 +345,7 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
     };
   });
 
-  if (!quiet) {
+  if (!true) {
     readline.clearLine(process.stdout, 0);
     readline.cursorTo(process.stdout, 0);
   }
@@ -442,10 +359,10 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
         .filter(filterExcludes)
         .slice(0, argv.recursive)
         .map(async (r) => {
-          const recursiveResults = await main(r.name, depths - 1, true);
+          const recursiveResults = await main(r.name, depths - 1);
           r.children = recursiveResults!;
           return r;
-        })
+        }),
     );
   }
 
@@ -457,7 +374,7 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
     await fs.writeFile(argv.file, JSON.stringify(results, null, 2), "utf-8");
   }
 
-  if (!quiet) {
+  if (!true) {
     console.log(pc.bold(pc.cyan("\nDependents sorted by downloads:")));
   }
 
@@ -471,23 +388,11 @@ async function main(inputPackage: string, depths = 0, quiet = false) {
     topResults = topResults.sort((a, b) => b.downloads - a.downloads);
   }
 
-  if (argv.output === "json") {
-    console.log(
-      JSON.stringify(
-        topResults.filter(filterExcludes).slice(0, argv.number),
-        null,
-        2
-      )
-    );
-  } else {
-    if (argv.output === "md") {
-      console.log(
-        `| # | Downloads | Traffic | Version | Package |\n|---|---|---|---|---|`
-      );
-    }
+  console.log(
+    `| # | Downloads | Traffic | Version | Package |\n|---|---|---|---|---|`,
+  );
 
-    printOutput(topResults);
-  }
+  printOutput(topResults);
 }
 
 const inputPackage = argv.pkg;
@@ -497,4 +402,4 @@ if (!inputPackage) {
   process.exit(1);
 }
 
-main(inputPackage, argv.depths, argv.quiet).catch(console.error);
+main(inputPackage, argv.depths).catch(console.error);
