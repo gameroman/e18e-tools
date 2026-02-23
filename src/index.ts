@@ -53,17 +53,6 @@ if (!argv) {
 const npmRegistryBaseUrl = "https://registry.npmmirror.com";
 const localCouchdbUrl = "https://npm.devminer.xyz/registry";
 
-if (!localCouchdbUrl) {
-  console.error(pc.red("Please provide a CouchDB URL."));
-  process.exit(1);
-}
-
-// const authHeader = "Basic " + Buffer.from("admin:admin").toString("base64");
-
-const getAuthHeaders = (): { Authorization: string } | {} => {
-  return {};
-};
-
 interface NpmPackageInfo {
   name: string;
   version: string;
@@ -125,7 +114,8 @@ function formatDownloads(downloads: number): string {
 }
 
 function formatTraffic(bytes: number): string {
-  if (bytes >= 1.5e12) return `${(bytes / 1e12).toFixed(2)} TB`;
+  if (bytes >= 1e15) return `${(bytes / 1e15).toFixed(2)} PB`;
+  if (bytes >= 1e12) return `${(bytes / 1e12).toFixed(2)} TB`;
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`;
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(2)} MB`;
   if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(2)} KB`;
@@ -144,8 +134,7 @@ async function fetchPackageInfo(
     }
     const data = (await response.json()) as NpmPackageInfo;
     return data;
-    // eslint-disable-next-line
-  } catch (_e) {
+  } catch {
     return null;
   }
 }
@@ -192,7 +181,6 @@ async function fetchDownloadStats(packageNames: string[]) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...getAuthHeaders(),
       },
       body: JSON.stringify({ keys: packageNames }),
     },

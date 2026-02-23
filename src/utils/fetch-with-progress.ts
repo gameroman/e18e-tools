@@ -2,9 +2,7 @@ export async function fetchWithProgress<T = unknown>(
   url: string,
   options?: RequestInit,
 ) {
-  const { ...fetchOptions } = options;
-
-  let response = await fetch(url, fetchOptions);
+  const response = await fetch(url, options);
 
   if (!response.ok) {
     throw new Error(`HTTP error! Status: ${response.status}`);
