@@ -108,8 +108,9 @@ interface DependentPackage {
 }
 
 function formatDownloads(downloads: number): string {
-  if (downloads >= 1_000_000) return `${(downloads / 1_000_000).toFixed(2)}M`;
-  if (downloads >= 1_000) return `${(downloads / 1_000).toFixed(2)}k`;
+  if (downloads >= 1e9) return `${(downloads / 1e9).toFixed(2)}B`;
+  if (downloads >= 1e6) return `${(downloads / 1e6).toFixed(2)}M`;
+  if (downloads >= 1e3) return `${(downloads / 1e3).toFixed(2)}k`;
   return downloads.toString();
 }
 
@@ -377,7 +378,7 @@ async function main(inputPackage: string, depths = 0) {
   }
 
   console.log(
-    `| # | Downloads | Traffic | Version | Package |\n|---|---|---|---|---|`,
+    `| # | Downloads/month | Traffic | Version | Package |\n|---|---|---|---|---|`,
   );
 
   printOutput(topResults);
