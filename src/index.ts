@@ -378,7 +378,10 @@ async function main(inputPackage: string, depths = 0) {
   }
 
   console.log(
-    `| # | Downloads/month | Traffic | Version | Package |\n|---|---|---|---|---|`,
+`\
+| # | Downloads/month | Traffic | Version | Package |
+|---|-----------------|---------|---------|---------|\
+`,
   );
 
   printOutput(topResults);
