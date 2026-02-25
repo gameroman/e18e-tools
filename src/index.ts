@@ -10,16 +10,28 @@ import semver from "semver";
 import { fetchWithProgress } from "./utils/fetch-with-progress";
 import { escapeMdTable } from "./utils/escape-md-table";
 
-let argv;
+interface Args {
+  pkg: string;
+  number: number;
+  file?: string;
+  exclude?: string;
+  dev: boolean;
+  list?: boolean;
+  recursive: number;
+  depths: number;
+  accumulate?: boolean;
+}
+
+let argv: Args;
 
 sade("e18e-tools [pkg]", true)
-  .option("--number, -n", "Number of dependents printed to stdout", Infinity)
+  .option("--number, -n", "Number of dependents printed to stdout", 200)
   .option("--file, -f", "Write results as json to the specified file")
   .option(
     "--exclude, -e",
     "Exclude packages that include the specified string (can be comma separated)",
   )
-  .option("--dev, -D", "Use devDependencies")
+  .option("--dev, -D", "Use devDependencies", false)
   .option(
     "--list, -l",
     "Only prints dependents as list to pipe into other commands",
@@ -225,7 +237,7 @@ type Results = {
   version: string;
 };
 
-function printOutput(results: Results[]) {
+function printOutput(results: Results[], dev = false) {
   results = results
     .filter(filterExcludes)
     .slice(0, argv.number)
@@ -246,8 +258,24 @@ function printOutput(results: Results[]) {
 
   const maxVersionWidth = Math.min(
     results.reduce((a, b) => Math.max(a, b.version.length), 0),
-    16,
+    24,
   );
+
+  if (!dev) {
+    console.log(
+      `\
+| # | Downloads/month | Traffic | Version | Package |
+|---|-----------------|---------|---------|---------|\
+`,
+    );
+  } else {
+    console.log(
+      `\
+| # | Downloads/month | Version | Package |
+|---|-----------------|---------|---------|\
+`,
+    );
+  }
 
   results.forEach((pkg, index) => {
     const indexStr = `${index + 1}`.padEnd(maxIndexWidth);
@@ -257,11 +285,17 @@ function printOutput(results: Results[]) {
     const trafficStr = pkg.traffic
       ? formatTraffic(pkg.traffic).padStart(maxTrafficWidth)
       : "".padStart(maxTrafficWidth);
-    const versionStr = pkg.version.slice(0, 16).padEnd(maxVersionWidth);
+    const versionStr = pkg.version.slice(0, 24).padEnd(maxVersionWidth);
 
-    console.log(
-      escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmx.dev/${pkg.name}) |`,
-    );
+    if (!dev) {
+      console.log(
+        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | [${pkg.name}](https://npmx.dev/${pkg.name}) |`,
+      );
+    } else {
+      console.log(
+        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${versionStr} | [${pkg.name}](https://npmx.dev/${pkg.name}) |`,
+      );
+    }
   });
 }
 
@@ -376,13 +410,6 @@ async function main(inputPackage: string, depths = 0) {
 
     topResults = topResults.sort((a, b) => b.downloads - a.downloads);
   }
-
-  console.log(
-`\
-| # | Downloads/month | Traffic | Version | Package |
-|---|-----------------|---------|---------|---------|\
-`,
-  );
 
   printOutput(topResults);
 }
