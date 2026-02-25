@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import fs from "node:fs/promises";
-import * as readline from "node:readline";
 
 import pc from "picocolors";
 import sade from "sade";
@@ -323,16 +322,6 @@ async function main(inputPackage: string, depths = 0) {
   }
 
   const actualVersion = packageInfo.version;
-  const homepage = packageInfo.homepage || "No homepage found";
-
-  if (!argv.list && !true) {
-    console.log(pc.bold(pc.cyan("Package Info:")));
-    console.log(
-      `${pc.green("Name:")} ${pc.yellow(packageInfo.name)} (${pc.magenta(actualVersion)})\n` +
-        `${pc.green("Homepage:")} ${pc.blue(homepage)}\n` +
-        `${pc.green("Unpacked Size:")} ${pc.yellow(formatTraffic(packageInfo.dist?.size ?? 0))}`,
-    );
-  }
 
   const dependentsWithVersion = await fetchDependents(packageName, argv.dev);
 
