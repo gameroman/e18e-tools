@@ -271,8 +271,8 @@ function printOutput(results: Results[], dev = false) {
   } else {
     console.log(
       `\
-| # | Downloads/month | Version | Package |
-|---|-----------------|---------|---------|\
+| # | Downloads/month | Package |
+|---|-----------------|---------|\
 `,
     );
   }
@@ -293,7 +293,7 @@ function printOutput(results: Results[], dev = false) {
       );
     } else {
       console.log(
-        escapeMdTable`| ${indexStr} | ${downloadsStr} | ${versionStr} | [${pkg.name}](https://npmx.dev/${pkg.name}) |`,
+        escapeMdTable`| ${indexStr} | ${downloadsStr} | [${pkg.name}](https://npmx.dev/${pkg.name}) |`,
       );
     }
   });
@@ -368,11 +368,6 @@ async function main(inputPackage: string, depths = 0) {
     };
   });
 
-  if (!true) {
-    readline.clearLine(process.stdout, 0);
-    readline.cursorTo(process.stdout, 0);
-  }
-
   results.sort((a, b) => b.downloads - a.downloads);
 
   let topResults = results;
@@ -397,10 +392,6 @@ async function main(inputPackage: string, depths = 0) {
     await fs.writeFile(argv.file, JSON.stringify(results, null, 2), "utf-8");
   }
 
-  if (!true) {
-    console.log(pc.bold(pc.cyan("\nDependents sorted by downloads:")));
-  }
-
   if (argv.accumulate) {
     topResults.forEach((result) => {
       result.downloads = accumulateStats(result);
@@ -411,7 +402,7 @@ async function main(inputPackage: string, depths = 0) {
     topResults = topResults.sort((a, b) => b.downloads - a.downloads);
   }
 
-  printOutput(topResults);
+  printOutput(topResults, argv.dev);
 }
 
 const inputPackage = argv.pkg;
