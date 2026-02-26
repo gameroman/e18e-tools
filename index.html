@@ -31,44 +31,48 @@
       }
     </style>
   </head>
-  <body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+  <body
+    class="bg-slate-50 dark:bg-slate-950 min-h-screen font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300"
+  >
     <div class="max-w-6xl mx-auto p-4 md:p-8">
-      <!-- Header -->
       <header class="mb-10 text-center">
-        <h1 class="text-4xl font-extrabold text-slate-800 mb-2">e18e Tools</h1>
-        <p class="text-slate-600 italic">
+        <h1 class="text-4xl font-extrabold text-slate-800 dark:text-white mb-2">
+          e18e Tools
+        </h1>
+        <p class="text-slate-600 dark:text-slate-400 italic">
           Analyze package dependents, downloads, and traffic across the
           ecosystem.
         </p>
       </header>
 
-      <!-- Search & Options Card -->
       <div
-        class="bg-white p-6 rounded-xl shadow-sm mb-8 border border-slate-200"
+        class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm mb-8 border border-slate-200 dark:border-slate-800"
       >
         <div
           class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end"
         >
           <div class="lg:col-span-2">
-            <label class="block text-sm font-semibold text-slate-700 mb-1"
+            <label
+              class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
               >Package Name (@version optional)</label
             >
             <input
               type="text"
               id="pkgInput"
               placeholder="e.g. lodash or @types/node@18"
-              class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              class="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all dark:text-white"
             />
           </div>
           <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1"
+            <label
+              class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
               >Limit Results</label
             >
             <input
               type="number"
               id="limitInput"
               value="200"
-              class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              class="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white"
             />
           </div>
           <button
@@ -112,56 +116,58 @@
           </button>
         </div>
 
-        <!-- Advanced Options -->
         <div
-          class="mt-6 pt-6 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          class="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
         >
           <label class="flex items-center gap-2 cursor-pointer group">
             <input
               type="checkbox"
               id="devCheckbox"
-              class="w-4 h-4 text-blue-600 rounded"
+              class="w-4 h-4 text-blue-600 rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
             />
-            <span class="text-sm text-slate-700 group-hover:text-slate-900"
+            <span
+              class="text-sm text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white"
               >Use devDependencies</span
             >
           </label>
           <div class="flex items-center gap-2">
-            <span class="text-sm text-slate-700">Recursive:</span>
+            <span class="text-sm text-slate-700 dark:text-slate-300"
+              >Recursive:</span
+            >
             <input
               type="number"
               id="recursiveInput"
               value="3"
-              class="w-16 px-2 py-1 border border-slate-300 rounded text-sm"
+              class="w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-sm dark:text-white"
             />
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-sm text-slate-700">Depth:</span>
+            <span class="text-sm text-slate-700 dark:text-slate-300"
+              >Depth:</span
+            >
             <input
               type="number"
               id="depthInput"
               value="0"
-              class="w-16 px-2 py-1 border border-slate-300 rounded text-sm"
+              class="w-16 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-sm dark:text-white"
             />
           </div>
         </div>
       </div>
 
-      <!-- Error Area -->
       <div
         id="errorBox"
-        class="hidden mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg"
+        class="hidden mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg"
       ></div>
 
-      <!-- Progress Indicator -->
       <div id="progressIndicator" class="hidden mb-6">
         <div
-          class="flex justify-between text-xs font-medium text-slate-500 mb-1"
+          class="flex justify-between text-xs font-medium text-slate-500 dark:text-slate-400 mb-1"
         >
           <span id="statusLabel">Fetching dependencies...</span>
           <span id="percentLabel">0%</span>
         </div>
-        <div class="w-full bg-slate-200 rounded-full h-1.5">
+        <div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5">
           <div
             id="progressBar"
             class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
@@ -170,16 +176,20 @@
         </div>
       </div>
 
-      <!-- Results Table -->
       <div id="resultsArea" class="hidden">
         <div class="flex justify-between items-center mb-4">
           <div class="flex items-center gap-4">
-            <h2 class="text-xl font-bold text-slate-800">Results</h2>
-            <div id="totalStats" class="text-sm text-slate-500"></div>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-white">
+              Results
+            </h2>
+            <div
+              id="totalStats"
+              class="text-sm text-slate-500 dark:text-slate-400"
+            ></div>
           </div>
           <button
             id="copyMarkdownBtn"
-            class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-1.5 px-3 rounded border border-slate-300 transition-colors flex items-center gap-1.5"
+            class="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold py-1.5 px-3 rounded border border-slate-300 dark:border-slate-600 transition-colors flex items-center gap-1.5"
           >
             <svg
               class="w-3.5 h-3.5"
@@ -197,10 +207,12 @@
             <span>Copy as Markdown</span>
           </button>
         </div>
-        <div class="table-container bg-white border border-slate-200">
+        <div
+          class="table-container bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+        >
           <table class="w-full text-left border-collapse">
             <thead
-              class="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-xs font-bold"
+              class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 uppercase text-xs font-bold"
             >
               <tr>
                 <th class="px-6 py-3">#</th>
@@ -212,21 +224,18 @@
             </thead>
             <tbody
               id="resultsTableBody"
-              class="divide-y divide-slate-100 text-sm"
-            >
-              <!-- Rows injected here -->
-            </tbody>
+              class="divide-y divide-slate-100 dark:divide-slate-800 text-sm"
+            ></tbody>
           </table>
         </div>
       </div>
 
-      <!-- Empty State -->
       <div
         id="emptyState"
-        class="text-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200"
+        class="text-center py-20 bg-white dark:bg-slate-900 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-800"
       >
         <svg
-          class="mx-auto h-12 w-12 text-slate-300"
+          class="mx-auto h-12 w-12 text-slate-300 dark:text-slate-700"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -238,7 +247,7 @@
             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
           />
         </svg>
-        <p class="mt-4 text-slate-500 font-medium">
+        <p class="mt-4 text-slate-500 dark:text-slate-400 font-medium">
           Enter a package name to start analysis.
         </p>
       </div>
