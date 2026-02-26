@@ -436,10 +436,10 @@
           results.sort((a, b) => b.downloads - a.downloads);
 
           const limit = parseInt(elements.limitInput.value) || 200;
-          const finalResults = results.slice(0, limit);
+          currentResults = results.slice(0, limit);
 
           updateProgress(100, "Analysis complete.");
-          displayResults(finalResults, elements.devCheckbox.checked);
+          displayResults(currentResults, elements.devCheckbox.checked);
         } catch (err) {
           showError(err.message);
         } finally {
