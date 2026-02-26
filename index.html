@@ -16,17 +16,14 @@
         background-size: 200% 100%;
         animation: shimmer 1.5s infinite;
       }
-
       @keyframes shimmer {
         0% {
           background-position: 200% 0;
         }
-
         100% {
           background-position: -200% 0;
         }
       }
-
       .table-container {
         overflow-x: auto;
         border-radius: 8px;
@@ -34,7 +31,6 @@
       }
     </style>
   </head>
-
   <body class="bg-slate-50 min-h-screen font-sans text-slate-900">
     <div class="max-w-6xl mx-auto p-4 md:p-8">
       <!-- Header -->
@@ -199,7 +195,7 @@
                 <th class="px-6 py-3">#</th>
                 <th class="px-6 py-3">Downloads/mo</th>
                 <th id="trafficHeader" class="px-6 py-3">Traffic</th>
-                <th class="px-6 py-3">Version Satisfied</th>
+                <th id="versionHeader" class="px-6 py-3">Version Satisfied</th>
                 <th class="px-6 py-3">Package</th>
               </tr>
             </thead>
@@ -238,6 +234,8 @@
     </div>
 
     <script type="module">
+      import semver from "https://esm.sh/semver@7.7.4";
+
       const npmRegistryBaseUrl = "https://registry.npmmirror.com";
       const localCouchdbUrl = "https://npm.devminer.xyz/registry";
 
@@ -259,6 +257,7 @@
         resultsTableBody: document.getElementById("resultsTableBody"),
         emptyState: document.getElementById("emptyState"),
         trafficHeader: document.getElementById("trafficHeader"),
+        versionHeader: document.getElementById("versionHeader"),
         progressBar: document.getElementById("progressBar"),
         percentLabel: document.getElementById("percentLabel"),
         statusLabel: document.getElementById("statusLabel"),
@@ -365,6 +364,8 @@
             throw new Error(`Failed to find package "${pkgName}" on registry.`);
           }
 
+          const actualVersion = packageInfo.version;
+
           updateProgress(
             30,
             `Searching for ${elements.devCheckbox.checked ? "dev" : ""} dependents...`,
@@ -374,12 +375,18 @@
             elements.devCheckbox.checked,
           );
 
-          // Simple version filtering (mocking semver.satisfies for browser environment)
-          // In a real production app, we would include the 'semver' library via CDN
-          const filteredDeps = allDependents;
+          // Version filtering using semver imported from esm.sh
+          const filteredDeps = allDependents.filter((dependent) => {
+            if (!requestedVersion) return true;
+            try {
+              return semver.satisfies(actualVersion, dependent.value.version);
+            } catch (e) {
+              return true;
+            }
+          });
 
           if (filteredDeps.length === 0) {
-            showError("No dependents found for this package.");
+            showError("No dependents found satisfying the version range.");
             setLoading(false);
             return;
           }
@@ -415,7 +422,10 @@
 
       function displayResults(data, isDev) {
         elements.resultsTableBody.innerHTML = "";
+
         elements.trafficHeader.classList.toggle("hidden", isDev);
+        elements.versionHeader.classList.toggle("hidden", isDev);
+
         elements.resultsArea.classList.remove("hidden");
         elements.emptyState.classList.add("hidden");
 
@@ -428,12 +438,15 @@
           const trafficCell = isDev
             ? ""
             : `<td class="px-6 py-4 font-mono text-slate-500">${formatTraffic(pkg.traffic)}</td>`;
+          const versionCell = isDev
+            ? ""
+            : `<td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">${pkg.version || "any"}</span></td>`;
 
           row.innerHTML = `
                     <td class="px-6 py-4 text-slate-400 font-medium">${i + 1}</td>
                     <td class="px-6 py-4 font-bold text-slate-700">${formatDownloads(pkg.downloads)}</td>
                     ${trafficCell}
-                    <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">${pkg.version || "any"}</span></td>
+                    ${versionCell}
                     <td class="px-6 py-4">
                         <a href="https://npmx.dev/${pkg.name}" target="_blank" class="text-blue-600 hover:underline font-medium">
                             ${pkg.name}
