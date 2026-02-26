@@ -126,16 +126,6 @@
               >Use devDependencies</span
             >
           </label>
-          <label class="flex items-center gap-2 cursor-pointer group">
-            <input
-              type="checkbox"
-              id="accumulateCheckbox"
-              class="w-4 h-4 text-blue-600 rounded"
-            />
-            <span class="text-sm text-slate-700 group-hover:text-slate-900"
-              >Accumulate Stats</span
-            >
-          </label>
           <div class="flex items-center gap-2">
             <span class="text-sm text-slate-700">Recursive:</span>
             <input
@@ -183,8 +173,29 @@
       <!-- Results Table -->
       <div id="resultsArea" class="hidden">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold text-slate-800">Results</h2>
-          <div id="totalStats" class="text-sm text-slate-500"></div>
+          <div class="flex items-center gap-4">
+            <h2 class="text-xl font-bold text-slate-800">Results</h2>
+            <div id="totalStats" class="text-sm text-slate-500"></div>
+          </div>
+          <button
+            id="copyMarkdownBtn"
+            class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-1.5 px-3 rounded border border-slate-300 transition-colors flex items-center gap-1.5"
+          >
+            <svg
+              class="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+              ></path>
+            </svg>
+            <span>Copy as Markdown</span>
+          </button>
         </div>
         <div class="table-container bg-white border border-slate-200">
           <table class="w-full text-left border-collapse">
@@ -233,6 +244,14 @@
       </div>
     </div>
 
+    <!-- Hidden textarea for clipboard copying -->
+    <textarea
+      id="copyBuffer"
+      class="sr-only"
+      aria-hidden="true"
+      style="position: absolute; left: -9999px"
+    ></textarea>
+
     <script type="module">
       import semver from "https://esm.sh/semver@7.7.4";
 
@@ -241,12 +260,13 @@
 
       // Global State
       let isLoading = false;
+      let currentResults = [];
+      let currentPackageSize = 0;
 
       const elements = {
         pkgInput: document.getElementById("pkgInput"),
         limitInput: document.getElementById("limitInput"),
         devCheckbox: document.getElementById("devCheckbox"),
-        accumulateCheckbox: document.getElementById("accumulateCheckbox"),
         recursiveInput: document.getElementById("recursiveInput"),
         depthInput: document.getElementById("depthInput"),
         searchBtn: document.getElementById("searchBtn"),
@@ -263,9 +283,18 @@
         statusLabel: document.getElementById("statusLabel"),
         progressIndicator: document.getElementById("progressIndicator"),
         totalStats: document.getElementById("totalStats"),
+        copyMarkdownBtn: document.getElementById("copyMarkdownBtn"),
+        copyBuffer: document.getElementById("copyBuffer"),
       };
 
-      // --- Formatting Utils ---
+      const reg = /[|`\\_]/g;
+      function escapeMdTable(str, ...values) {
+        return String.raw(
+          { raw: str },
+          ...values.map((v) => v.replace(reg, "\\$&")),
+        );
+      }
+
       function formatDownloads(downloads) {
         if (downloads >= 1e9) return `${(downloads / 1e9).toFixed(2)}B`;
         if (downloads >= 1e6) return `${(downloads / 1e6).toFixed(2)}M`;
@@ -282,9 +311,9 @@
         return `${bytes} bytes`;
       }
 
-      function getPackageAndVersion(input) {
+      function getPackageNameAndVersion(input) {
         const scoped = input.startsWith("@");
-        let packageName, version;
+        let [packageName, version] = input.split("@");
         if (scoped) {
           const atPos = input.lastIndexOf("@");
           if (atPos === 0) {
@@ -293,8 +322,6 @@
             packageName = input.slice(0, atPos);
             version = input.slice(atPos + 1);
           }
-        } else {
-          [packageName, version] = input.split("@");
         }
         return [packageName, version];
       }
@@ -316,14 +343,16 @@
         const url = `${localCouchdbUrl}/_design/dependents/_view/${view}?key="${packageName}"`;
         try {
           const res = await fetch(url);
-          if (!res.ok) return [];
+          if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
           const data = await res.json();
-          return data.rows.map((row) => {
-            if (typeof row.value === "string") {
-              return { value: { name: row.id, version: "" } };
-            }
-            return row;
-          });
+
+          if (data.rows.length && typeof data.rows[0].value === "string") {
+            return data.rows.map((p) => ({
+              ...p,
+              value: { name: p.id, version: "" },
+            }));
+          }
+          return data.rows;
         } catch {
           return [];
         }
@@ -357,13 +386,14 @@
 
         try {
           const [pkgName, requestedVersion] =
-            getPackageAndVersion(pkgNameInput);
+            getPackageNameAndVersion(pkgNameInput);
           const packageInfo = await fetchPackageInfo(pkgName, requestedVersion);
 
           if (!packageInfo) {
-            throw new Error(`Failed to find package "${pkgName}" on registry.`);
+            throw new Error(`Failed to fetch package info for ${pkgName}`);
           }
 
+          currentPackageSize = packageInfo.dist?.size ?? 0;
           const actualVersion = packageInfo.version;
 
           updateProgress(
@@ -375,14 +405,11 @@
             elements.devCheckbox.checked,
           );
 
-          // Version filtering using semver imported from esm.sh
           const filteredDeps = allDependents.filter((dependent) => {
-            if (!requestedVersion) return true;
-            try {
-              return semver.satisfies(actualVersion, dependent.value.version);
-            } catch (e) {
-              return true;
-            }
+            return (
+              !requestedVersion ||
+              semver.satisfies(actualVersion, dependent.value.version)
+            );
           });
 
           if (filteredDeps.length === 0) {
@@ -397,7 +424,7 @@
 
           const results = filteredDeps.map((dep) => {
             const downloads = downloadStats[dep.value.name] ?? 0;
-            const traffic = downloads * (packageInfo.dist?.size ?? 0);
+            const traffic = downloads * currentPackageSize;
             return {
               name: dep.value.name,
               version: dep.value.version,
@@ -457,6 +484,48 @@
         });
       }
 
+      function copyMarkdown() {
+        if (!currentResults.length) return;
+
+        const isDev = elements.devCheckbox.checked;
+        let md = "";
+
+        // Header
+        if (!isDev) {
+          md += `| # | Downloads/month | Traffic | Version | Package |\n`;
+          md += `|---|-----------------|---------|---------|---------|\n`;
+        } else {
+          md += `| # | Downloads/month | Package |\n`;
+          md += `|---|-----------------|---------|\n`;
+        }
+
+        currentResults.forEach((pkg, i) => {
+          const indexStr = `${i + 1}`;
+          const downloadsStr = formatDownloads(pkg.downloads);
+          const trafficStr = formatTraffic(pkg.traffic);
+          const versionStr = pkg.version || "any";
+          const pkgLink = `[${pkg.name}](https://npmx.dev/${pkg.name})`;
+
+          if (!isDev) {
+            md += escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | ${pkgLink} |\n`;
+          } else {
+            md += escapeMdTable`| ${indexStr} | ${downloadsStr} | ${pkgLink} |\n`;
+          }
+        });
+
+        elements.copyBuffer.value = md;
+        elements.copyBuffer.select();
+        document.execCommand("copy");
+
+        // Feedback
+        const btn = elements.copyMarkdownBtn;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "<span>Copied!</span>";
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+        }, 2000);
+      }
+
       // --- UI State Helpers ---
       function setLoading(val) {
         isLoading = val;
@@ -487,6 +556,7 @@
       elements.pkgInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") startAnalysis();
       });
+      elements.copyMarkdownBtn.addEventListener("click", copyMarkdown);
     </script>
   </body>
 </html>
