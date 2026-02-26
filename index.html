@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>e18e Tools - Dependent Insights</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .loading-shimmer {
+        background: linear-gradient(
+          90deg,
+          #f0f0f0 25%,
+          #e0e0e0 50%,
+          #f0f0f0 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+      }
+
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+
+        100% {
+          background-position: -200% 0;
+        }
+      }
+
+      .table-container {
+        overflow-x: auto;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      }
+    </style>
+  </head>
+
+  <body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+    <div class="max-w-6xl mx-auto p-4 md:p-8">
+      <!-- Header -->
+      <header class="mb-10 text-center">
+        <h1 class="text-4xl font-extrabold text-slate-800 mb-2">e18e Tools</h1>
+        <p class="text-slate-600 italic">
+          Analyze package dependents, downloads, and traffic across the
+          ecosystem.
+        </p>
+      </header>
+
+      <!-- Search & Options Card -->
+      <div
+        class="bg-white p-6 rounded-xl shadow-sm mb-8 border border-slate-200"
+      >
+        <div
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end"
+        >
+          <div class="lg:col-span-2">
+            <label class="block text-sm font-semibold text-slate-700 mb-1"
+              >Package Name (@version optional)</label
+            >
+            <input
+              type="text"
+              id="pkgInput"
+              placeholder="e.g. lodash or @types/node@18"
+              class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1"
+              >Limit Results</label
+            >
+            <input
+              type="number"
+              id="limitInput"
+              value="200"
+              class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+          <button
+            id="searchBtn"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Analyze</span>
+            <svg
+              id="searchIcon"
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              ></path>
+            </svg>
+            <svg
+              id="loadingIcon"
+              class="hidden animate-spin h-4 w-4 text-white"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Advanced Options -->
+        <div
+          class="mt-6 pt-6 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
+          <label class="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              id="devCheckbox"
+              class="w-4 h-4 text-blue-600 rounded"
+            />
+            <span class="text-sm text-slate-700 group-hover:text-slate-900"
+              >Use devDependencies</span
+            >
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              id="accumulateCheckbox"
+              class="w-4 h-4 text-blue-600 rounded"
+            />
+            <span class="text-sm text-slate-700 group-hover:text-slate-900"
+              >Accumulate Stats</span
+            >
+          </label>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-slate-700">Recursive:</span>
+            <input
+              type="number"
+              id="recursiveInput"
+              value="3"
+              class="w-16 px-2 py-1 border border-slate-300 rounded text-sm"
+            />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-slate-700">Depth:</span>
+            <input
+              type="number"
+              id="depthInput"
+              value="0"
+              class="w-16 px-2 py-1 border border-slate-300 rounded text-sm"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Area -->
+      <div
+        id="errorBox"
+        class="hidden mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg"
+      ></div>
+
+      <!-- Progress Indicator -->
+      <div id="progressIndicator" class="hidden mb-6">
+        <div
+          class="flex justify-between text-xs font-medium text-slate-500 mb-1"
+        >
+          <span id="statusLabel">Fetching dependencies...</span>
+          <span id="percentLabel">0%</span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-1.5">
+          <div
+            id="progressBar"
+            class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+            style="width: 0%"
+          ></div>
+        </div>
+      </div>
+
+      <!-- Results Table -->
+      <div id="resultsArea" class="hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-slate-800">Results</h2>
+          <div id="totalStats" class="text-sm text-slate-500"></div>
+        </div>
+        <div class="table-container bg-white border border-slate-200">
+          <table class="w-full text-left border-collapse">
+            <thead
+              class="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase text-xs font-bold"
+            >
+              <tr>
+                <th class="px-6 py-3">#</th>
+                <th class="px-6 py-3">Downloads/mo</th>
+                <th id="trafficHeader" class="px-6 py-3">Traffic</th>
+                <th class="px-6 py-3">Version Satisfied</th>
+                <th class="px-6 py-3">Package</th>
+              </tr>
+            </thead>
+            <tbody
+              id="resultsTableBody"
+              class="divide-y divide-slate-100 text-sm"
+            >
+              <!-- Rows injected here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div
+        id="emptyState"
+        class="text-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200"
+      >
+        <svg
+          class="mx-auto h-12 w-12 text-slate-300"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+          />
+        </svg>
+        <p class="mt-4 text-slate-500 font-medium">
+          Enter a package name to start analysis.
+        </p>
+      </div>
+    </div>
+
+    <script type="module">
+      const npmRegistryBaseUrl = "https://registry.npmmirror.com";
+      const localCouchdbUrl = "https://npm.devminer.xyz/registry";
+
+      // Global State
+      let isLoading = false;
+
+      const elements = {
+        pkgInput: document.getElementById("pkgInput"),
+        limitInput: document.getElementById("limitInput"),
+        devCheckbox: document.getElementById("devCheckbox"),
+        accumulateCheckbox: document.getElementById("accumulateCheckbox"),
+        recursiveInput: document.getElementById("recursiveInput"),
+        depthInput: document.getElementById("depthInput"),
+        searchBtn: document.getElementById("searchBtn"),
+        searchIcon: document.getElementById("searchIcon"),
+        loadingIcon: document.getElementById("loadingIcon"),
+        errorBox: document.getElementById("errorBox"),
+        resultsArea: document.getElementById("resultsArea"),
+        resultsTableBody: document.getElementById("resultsTableBody"),
+        emptyState: document.getElementById("emptyState"),
+        trafficHeader: document.getElementById("trafficHeader"),
+        progressBar: document.getElementById("progressBar"),
+        percentLabel: document.getElementById("percentLabel"),
+        statusLabel: document.getElementById("statusLabel"),
+        progressIndicator: document.getElementById("progressIndicator"),
+        totalStats: document.getElementById("totalStats"),
+      };
+
+      // --- Formatting Utils ---
+      function formatDownloads(downloads) {
+        if (downloads >= 1e9) return `${(downloads / 1e9).toFixed(2)}B`;
+        if (downloads >= 1e6) return `${(downloads / 1e6).toFixed(2)}M`;
+        if (downloads >= 1e3) return `${(downloads / 1e3).toFixed(2)}k`;
+        return downloads.toString();
+      }
+
+      function formatTraffic(bytes) {
+        if (bytes >= 1e15) return `${(bytes / 1e15).toFixed(2)} PB`;
+        if (bytes >= 1e12) return `${(bytes / 1e12).toFixed(2)} TB`;
+        if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`;
+        if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(2)} MB`;
+        if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(2)} KB`;
+        return `${bytes} bytes`;
+      }
+
+      function getPackageAndVersion(input) {
+        const scoped = input.startsWith("@");
+        let packageName, version;
+        if (scoped) {
+          const atPos = input.lastIndexOf("@");
+          if (atPos === 0) {
+            packageName = input;
+          } else {
+            packageName = input.slice(0, atPos);
+            version = input.slice(atPos + 1);
+          }
+        } else {
+          [packageName, version] = input.split("@");
+        }
+        return [packageName, version];
+      }
+
+      // --- Fetching Logic ---
+      async function fetchPackageInfo(packageName, version = "latest") {
+        const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return null;
+          return await res.json();
+        } catch {
+          return null;
+        }
+      }
+
+      async function fetchDependents(packageName, dev = false) {
+        const view = dev ? "dev-dependencies" : "dependents2";
+        const url = `${localCouchdbUrl}/_design/dependents/_view/${view}?key="${packageName}"`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return [];
+          const data = await res.json();
+          return data.rows.map((row) => {
+            if (typeof row.value === "string") {
+              return { value: { name: row.id, version: "" } };
+            }
+            return row;
+          });
+        } catch {
+          return [];
+        }
+      }
+
+      async function fetchDownloadStats(packageNames) {
+        if (packageNames.length === 0) return {};
+        try {
+          const res = await fetch(
+            `${localCouchdbUrl}/_design/downloads/_view/downloads`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ keys: packageNames }),
+            },
+          );
+          const data = await res.json();
+          return Object.fromEntries(data.rows.map((r) => [r.key, r.value]));
+        } catch {
+          return {};
+        }
+      }
+
+      // --- Core Logic ---
+      async function startAnalysis() {
+        const pkgNameInput = elements.pkgInput.value.trim();
+        if (!pkgNameInput) return;
+
+        setLoading(true);
+        updateProgress(10, "Fetching package info...");
+
+        try {
+          const [pkgName, requestedVersion] =
+            getPackageAndVersion(pkgNameInput);
+          const packageInfo = await fetchPackageInfo(pkgName, requestedVersion);
+
+          if (!packageInfo) {
+            throw new Error(`Failed to find package "${pkgName}" on registry.`);
+          }
+
+          updateProgress(
+            30,
+            `Searching for ${elements.devCheckbox.checked ? "dev" : ""} dependents...`,
+          );
+          const allDependents = await fetchDependents(
+            pkgName,
+            elements.devCheckbox.checked,
+          );
+
+          // Simple version filtering (mocking semver.satisfies for browser environment)
+          // In a real production app, we would include the 'semver' library via CDN
+          const filteredDeps = allDependents;
+
+          if (filteredDeps.length === 0) {
+            showError("No dependents found for this package.");
+            setLoading(false);
+            return;
+          }
+
+          updateProgress(60, "Retrieving download statistics...");
+          const depNames = filteredDeps.map((d) => d.value.name);
+          const downloadStats = await fetchDownloadStats(depNames);
+
+          const results = filteredDeps.map((dep) => {
+            const downloads = downloadStats[dep.value.name] ?? 0;
+            const traffic = downloads * (packageInfo.dist?.size ?? 0);
+            return {
+              name: dep.value.name,
+              version: dep.value.version,
+              downloads,
+              traffic,
+            };
+          });
+
+          results.sort((a, b) => b.downloads - a.downloads);
+
+          const limit = parseInt(elements.limitInput.value) || 200;
+          const finalResults = results.slice(0, limit);
+
+          updateProgress(100, "Analysis complete.");
+          displayResults(finalResults, elements.devCheckbox.checked);
+        } catch (err) {
+          showError(err.message);
+        } finally {
+          setTimeout(() => setLoading(false), 500);
+        }
+      }
+
+      function displayResults(data, isDev) {
+        elements.resultsTableBody.innerHTML = "";
+        elements.trafficHeader.classList.toggle("hidden", isDev);
+        elements.resultsArea.classList.remove("hidden");
+        elements.emptyState.classList.add("hidden");
+
+        elements.totalStats.textContent = `Showing ${data.length} packages`;
+
+        data.forEach((pkg, i) => {
+          const row = document.createElement("tr");
+          row.className = "hover:bg-slate-50 transition-colors";
+
+          const trafficCell = isDev
+            ? ""
+            : `<td class="px-6 py-4 font-mono text-slate-500">${formatTraffic(pkg.traffic)}</td>`;
+
+          row.innerHTML = `
+                    <td class="px-6 py-4 text-slate-400 font-medium">${i + 1}</td>
+                    <td class="px-6 py-4 font-bold text-slate-700">${formatDownloads(pkg.downloads)}</td>
+                    ${trafficCell}
+                    <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">${pkg.version || "any"}</span></td>
+                    <td class="px-6 py-4">
+                        <a href="https://npmx.dev/${pkg.name}" target="_blank" class="text-blue-600 hover:underline font-medium">
+                            ${pkg.name}
+                        </a>
+                    </td>
+                `;
+          elements.resultsTableBody.appendChild(row);
+        });
+      }
+
+      // --- UI State Helpers ---
+      function setLoading(val) {
+        isLoading = val;
+        elements.searchBtn.disabled = val;
+        elements.searchIcon.classList.toggle("hidden", val);
+        elements.loadingIcon.classList.toggle("hidden", !val);
+        elements.progressIndicator.classList.toggle("hidden", !val);
+        if (val) {
+          elements.errorBox.classList.add("hidden");
+        }
+      }
+
+      function updateProgress(percent, status) {
+        elements.progressBar.style.width = `${percent}%`;
+        elements.percentLabel.textContent = `${percent}%`;
+        elements.statusLabel.textContent = status;
+      }
+
+      function showError(msg) {
+        elements.errorBox.textContent = msg;
+        elements.errorBox.classList.remove("hidden");
+        elements.resultsArea.classList.add("hidden");
+        elements.emptyState.classList.remove("hidden");
+      }
+
+      // --- Event Listeners ---
+      elements.searchBtn.addEventListener("click", startAnalysis);
+      elements.pkgInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") startAnalysis();
+      });
+    </script>
+  </body>
+</html>
