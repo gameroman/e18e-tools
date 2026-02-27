@@ -296,9 +296,9 @@
         copyBuffer: document.getElementById("copyBuffer"),
       };
 
-      // --- URL Sync Logic ---
-      function updateUrlParams({ pkg, isDev }) {
+      function updateUrlParams({ pkg, isDev, limit }) {
         const url = new URL(window.location);
+
         if (pkg === "") {
           url.searchParams.delete("package");
         } else if (pkg) {
@@ -310,6 +310,13 @@
         } else if (isDev) {
           url.searchParams.set("dev", "true");
         }
+
+        if (limit === "" || limit === "200") {
+          url.searchParams.delete("limit");
+        } else if (limit) {
+          url.searchParams.set("limit", limit);
+        }
+
         window.history.pushState({}, "", url);
       }
 
@@ -317,12 +324,16 @@
         const params = new URLSearchParams(window.location.search);
         const pkg = params.get("package");
         const dev = params.get("dev");
+        const limit = params.get("limit");
 
         if (pkg) {
           elements.pkgInput.value = pkg;
         }
         if (dev === "true") {
           elements.devCheckbox.checked = true;
+        }
+        if (limit) {
+          elements.limitInput.value = limit;
         }
 
         if (pkg) {
@@ -425,7 +436,10 @@
         const pkgNameInput = elements.pkgInput.value.trim();
         if (!pkgNameInput) return;
 
-        updateUrlParams({ pkg: pkgNameInput });
+        updateUrlParams({
+          pkg: pkgNameInput,
+          limit: elements.limitInput.value,
+        });
 
         setLoading(true);
         updateProgress(10, "Fetching package info...");
@@ -598,6 +612,9 @@
       // --- Event Listeners ---
       elements.searchBtn.addEventListener("click", startAnalysis);
       elements.pkgInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") startAnalysis();
+      });
+      elements.limitInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") startAnalysis();
       });
       elements.devCheckbox.addEventListener("change", () => {
