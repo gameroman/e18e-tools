@@ -296,6 +296,40 @@
         copyBuffer: document.getElementById("copyBuffer"),
       };
 
+      // --- URL Sync Logic ---
+      function updateUrlParams({ pkg, isDev }) {
+        const url = new URL(window.location);
+        if (pkg === "") {
+          url.searchParams.delete("package");
+        } else if (pkg) {
+          url.searchParams.set("package", pkg);
+        }
+
+        if (isDev === false) {
+          url.searchParams.delete("dev");
+        } else if (isDev) {
+          url.searchParams.set("dev", "true");
+        }
+        window.history.pushState({}, "", url);
+      }
+
+      function loadParamsFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const pkg = params.get("package");
+        const dev = params.get("dev");
+
+        if (pkg) {
+          elements.pkgInput.value = pkg;
+        }
+        if (dev === "true") {
+          elements.devCheckbox.checked = true;
+        }
+
+        if (pkg) {
+          startAnalysis();
+        }
+      }
+
       const reg = /[|`\\_]/g;
       function escapeMdTable(str, ...values) {
         return String.raw(
@@ -327,6 +361,7 @@
           const atPos = input.lastIndexOf("@");
           if (atPos === 0) {
             packageName = input;
+            version = undefined;
           } else {
             packageName = input.slice(0, atPos);
             version = input.slice(atPos + 1);
@@ -389,6 +424,8 @@
       async function startAnalysis() {
         const pkgNameInput = elements.pkgInput.value.trim();
         if (!pkgNameInput) return;
+
+        updateUrlParams({ pkg: pkgNameInput });
 
         setLoading(true);
         updateProgress(10, "Fetching package info...");
@@ -479,16 +516,16 @@
             : `<td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">${pkg.version || "any"}</span></td>`;
 
           row.innerHTML = `
-                    <td class="px-6 py-4 text-slate-400 font-medium">${i + 1}</td>
-                    <td class="px-6 py-4 font-bold text-slate-700">${formatDownloads(pkg.downloads)}</td>
-                    ${trafficCell}
-                    ${versionCell}
-                    <td class="px-6 py-4">
-                        <a href="https://npmx.dev/${pkg.name}" target="_blank" class="text-blue-600 hover:underline font-medium">
-                            ${pkg.name}
-                        </a>
-                    </td>
-                `;
+              <td class="px-6 py-4 text-slate-400 font-medium">${i + 1}</td>
+              <td class="px-6 py-4 font-bold text-slate-700">${formatDownloads(pkg.downloads)}</td>
+              ${trafficCell}
+              ${versionCell}
+              <td class="px-6 py-4">
+                  <a href="https://npmx.dev/${pkg.name}" target="_blank" class="text-blue-600 hover:underline font-medium">
+                      ${pkg.name}
+                  </a>
+              </td>
+            `;
           elements.resultsTableBody.appendChild(row);
         });
       }
@@ -499,7 +536,6 @@
         const isDev = elements.devCheckbox.checked;
         let md = "";
 
-        // Header
         if (!isDev) {
           md += `| # | Downloads/month | Traffic | Version | Package |\n`;
           md += `|---|-----------------|---------|---------|---------|\n`;
@@ -526,7 +562,6 @@
         elements.copyBuffer.select();
         document.execCommand("copy");
 
-        // Feedback
         const btn = elements.copyMarkdownBtn;
         const originalText = btn.innerHTML;
         btn.innerHTML = "<span>Copied!</span>";
@@ -565,7 +600,12 @@
       elements.pkgInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") startAnalysis();
       });
+      elements.devCheckbox.addEventListener("change", () => {
+        updateUrlParams({ isDev: elements.devCheckbox.checked });
+      });
       elements.copyMarkdownBtn.addEventListener("click", copyMarkdown);
+
+      window.addEventListener("DOMContentLoaded", loadParamsFromUrl);
     </script>
   </body>
 </html>

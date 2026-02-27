@@ -203,7 +203,7 @@ async function fetchDownloadStats(packageNames: string[]) {
   return Object.fromEntries(docs);
 }
 
-const getnameAndVersion = (
+const getPackageNameAndVersion = (
   inputPackage: string,
 ): [string, string | undefined] => {
   const scoped = inputPackage.startsWith("@");
@@ -309,7 +309,7 @@ const filterExcludes = (pkg: DependentPackage) =>
   argv.exclude?.split(",").every((ex) => !pkg.name.includes(ex)) ?? true;
 
 async function main(inputPackage: string, depths = 0) {
-  const [packageName, version] = getnameAndVersion(inputPackage);
+  const [packageName, version] = getPackageNameAndVersion(inputPackage);
 
   const packageInfo = await fetchPackageInfo(packageName, version);
 
