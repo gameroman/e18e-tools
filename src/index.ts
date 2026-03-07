@@ -62,7 +62,8 @@ if (!argv) {
 }
 
 const npmRegistryBaseUrl = "https://registry.npmmirror.com";
-const localCouchdbUrl = "https://npm.devminer.xyz/registry";
+const registryUrl = "https://npm.devminer.xyz/registry";
+const liveRegistryUrl = "https://npm.devminer.xyz/live_registry";
 
 interface NpmPackageInfo {
   name: string;
@@ -153,7 +154,7 @@ async function fetchPackageInfo(
 
 async function fetchDependents(packageName: string, dev = false) {
   const deps = dev ? "dev-dependencies" : "dependents2";
-  const url = `${localCouchdbUrl}/_design/dependents/_view/${deps}?key="${packageName}"`;
+  const url = `${registryUrl}/_design/dependents/_view/${deps}?key="${packageName}"`;
 
   const response = await fetch(url);
 
@@ -188,7 +189,7 @@ async function fetchDownloadStats(packageNames: string[]) {
   };
 
   const response = await fetchWithProgress<Stats>(
-    `${localCouchdbUrl}/_design/downloads/_view/downloads`,
+    `${liveRegistryUrl}/_design/downloads/_view/downloads`,
     {
       method: "POST",
       headers: {
