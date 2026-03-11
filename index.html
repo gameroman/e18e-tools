@@ -623,7 +623,9 @@
       });
       elements.copyMarkdownBtn.addEventListener("click", copyMarkdown);
 
+      window.addEventListener("popstate", loadParamsFromUrl);
       window.addEventListener("DOMContentLoaded", loadParamsFromUrl);
     </script>
   </body>
 </html>
+
