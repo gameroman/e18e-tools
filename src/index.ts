@@ -1,10 +1,9 @@
 #!/usr/bin/env bun
 
-import fs from "node:fs/promises";
+import * as fs from "node:fs/promises";
 
 import pc from "picocolors";
 import sade from "sade";
-import semver from "semver";
 
 import { fetchWithProgress } from "./utils/fetch-with-progress";
 import { escapeMdTable } from "./utils/escape-md-table";
@@ -57,13 +56,13 @@ sade("e18e-tools [pkg]", true)
 
 // If we don't run the app (e.g. just show help or version),
 // we can just exit it gracefully.
+// @ts-expect-error
 if (!argv) {
   process.exit(0);
 }
 
 const npmRegistryBaseUrl = "https://registry.npmmirror.com";
-const registryUrl = "https://npm.devminer.xyz/registry";
-const liveRegistryUrl = "https://npm.devminer.xyz/live_registry";
+const registryUrl = "https://npm.devminer.xyz/live_registry";
 
 interface NpmPackageInfo {
   name: string;
@@ -166,7 +165,7 @@ async function fetchDependents(packageName: string, dev = false) {
     | LocalDependendsResponseDev
     | LocalDependendsResponseProd;
 
-  if (data.rows.length && typeof data.rows[0].value === "string") {
+  if (data.rows.length && typeof data.rows[0]?.value === "string") {
     return data.rows.map((p) => {
       return {
         ...p,
@@ -189,7 +188,7 @@ async function fetchDownloadStats(packageNames: string[]) {
   };
 
   const response = await fetchWithProgress<Stats>(
-    `${liveRegistryUrl}/_design/downloads/_view/downloads`,
+    `${registryUrl}/_design/downloads/_view/downloads`,
     {
       method: "POST",
       headers: {
@@ -329,7 +328,7 @@ async function main(inputPackage: string, depths = 0) {
   const dependents = dependentsWithVersion.filter((dependent) => {
     return (
       // Dont filter when no version was given
-      !version || semver.satisfies(actualVersion, dependent.value.version)
+      !version || Bun.semver.satisfies(actualVersion, dependent.value.version)
     );
   });
 

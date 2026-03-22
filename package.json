@@ -1,16 +1,15 @@
 {
   "name": "e18e-tools",
   "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot index.html"
+  },
   "dependencies": {
     "picocolors": "^1.1.1",
-    "sade": "^1.8.1",
-    "semver": "^7.6.3"
+    "sade": "^1.8.1"
   },
   "devDependencies": {
-    "@types/node": "^22.9.0",
-    "@types/semver": "^7.5.8"
-  },
-  "bin": {
-    "e18e-tools": "./src/index.ts"
+    "@types/node": "^22.9.0"
   }
 }
