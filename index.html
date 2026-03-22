@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>e18e Tools - Dependent Insights</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .loading-shimmer {
+        background: linear-gradient(
+          90deg,
+          #f0f0f0 25%,
+          #e0e0e0 50%,
+          #f0f0f0 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+      }
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+      .table-container {
+        overflow-x: auto;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      }
+    </style>
+  </head>
+  <body
+    class="bg-slate-50 dark:bg-slate-950 min-h-screen font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300"
+  >
+    <div class="max-w-6xl mx-auto p-4 md:p-8">
+      <header class="mb-10 text-center">
+        <h1 class="text-4xl font-extrabold text-slate-800 dark:text-white mb-2">
+          e18e Tools
+        </h1>
+        <p class="text-slate-600 dark:text-slate-400 italic">
+          Analyze package dependents, downloads, and traffic across the
+          ecosystem.
+        </p>
+      </header>
+
+      <div
+        class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm mb-8 border border-slate-200 dark:border-slate-800"
+      >
+        <div
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end"
+        >
+          <div class="lg:col-span-2">
+            <label
+              class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
+              >Package Name (@version optional)</label
+            >
+            <input
+              type="text"
+              id="pkgInput"
+              placeholder="e.g. lodash or @types/node@18"
+              class="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all dark:text-white"
+            />
+          </div>
+          <div>
+            <label
+              class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
+              >Limit Results</label
+            >
+            <input
+              type="number"
+              id="limitInput"
+              value="200"
+              class="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white"
+            />
+          </div>
+          <button
+            id="searchBtn"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Analyze</span>
+            <svg
+              id="searchIcon"
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              ></path>
+            </svg>
+            <svg
+              id="loadingIcon"
+              class="hidden animate-spin h-4 w-4 text-white"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </button>
+        </div>
+
+        <div
+          class="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
+          <label class="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              id="devCheckbox"
+              class="w-4 h-4 text-blue-600 rounded bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+            />
+            <span
+              class="text-sm text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white"
+              >Use devDependencies</span
+            >
+          </label>
+        </div>
+      </div>
+
+      <div
+        id="errorBox"
+        class="hidden mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg"
+      ></div>
+
+      <div id="progressIndicator" class="hidden mb-6">
+        <div
+          class="flex justify-between text-xs font-medium text-slate-500 dark:text-slate-400 mb-1"
+        >
+          <span id="statusLabel">Fetching dependencies...</span>
+          <span id="percentLabel">0%</span>
+        </div>
+        <div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5">
+          <div
+            id="progressBar"
+            class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+            style="width: 0%"
+          ></div>
+        </div>
+      </div>
+
+      <div id="resultsArea" class="hidden">
+        <div class="flex justify-between items-center mb-4">
+          <div class="flex items-center gap-4">
+            <h2 class="text-xl font-bold text-slate-800 dark:text-white">
+              Results
+            </h2>
+            <div
+              id="totalStats"
+              class="text-sm text-slate-500 dark:text-slate-400"
+            ></div>
+          </div>
+          <button
+            id="copyMarkdownBtn"
+            class="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold py-1.5 px-3 rounded border border-slate-300 dark:border-slate-600 transition-colors flex items-center gap-1.5"
+          >
+            <svg
+              class="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+              ></path>
+            </svg>
+            <span>Copy as Markdown</span>
+          </button>
+        </div>
+        <div
+          class="table-container bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+        >
+          <table class="w-full text-left border-collapse">
+            <thead
+              class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 uppercase text-xs font-bold"
+            >
+              <tr>
+                <th class="px-6 py-3">#</th>
+                <th class="px-6 py-3">Downloads/mo</th>
+                <th id="trafficHeader" class="px-6 py-3">Traffic</th>
+                <th id="versionHeader" class="px-6 py-3">Version Satisfied</th>
+                <th class="px-6 py-3">Package</th>
+              </tr>
+            </thead>
+            <tbody
+              id="resultsTableBody"
+              class="divide-y divide-slate-100 dark:divide-slate-800 text-sm"
+            ></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div
+        id="emptyState"
+        class="text-center py-20 bg-white dark:bg-slate-900 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-800"
+      >
+        <svg
+          class="mx-auto h-12 w-12 text-slate-300 dark:text-slate-700"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+          />
+        </svg>
+        <p class="mt-4 text-slate-500 dark:text-slate-400 font-medium">
+          Enter a package name to start analysis.
+        </p>
+      </div>
+    </div>
+
+    <!-- Hidden textarea for clipboard copying -->
+    <textarea
+      id="copyBuffer"
+      class="sr-only"
+      aria-hidden="true"
+      style="position: absolute; left: -9999px"
+    ></textarea>
+
+    <script type="module">
+      import semver from "https://esm.sh/semver@7.7.4";
+
+      const npmRegistryBaseUrl = "https://registry.npmmirror.com";
+      const registryUrl = "https://npm.devminer.xyz/live_registry";
+
+      // Global State
+      let isLoading = false;
+      let currentResults = [];
+      let currentPackageSize = 0;
+
+      const elements = {
+        pkgInput: document.getElementById("pkgInput"),
+        limitInput: document.getElementById("limitInput"),
+        devCheckbox: document.getElementById("devCheckbox"),
+        searchBtn: document.getElementById("searchBtn"),
+        searchIcon: document.getElementById("searchIcon"),
+        loadingIcon: document.getElementById("loadingIcon"),
+        errorBox: document.getElementById("errorBox"),
+        resultsArea: document.getElementById("resultsArea"),
+        resultsTableBody: document.getElementById("resultsTableBody"),
+        emptyState: document.getElementById("emptyState"),
+        trafficHeader: document.getElementById("trafficHeader"),
+        versionHeader: document.getElementById("versionHeader"),
+        progressBar: document.getElementById("progressBar"),
+        percentLabel: document.getElementById("percentLabel"),
+        statusLabel: document.getElementById("statusLabel"),
+        progressIndicator: document.getElementById("progressIndicator"),
+        totalStats: document.getElementById("totalStats"),
+        copyMarkdownBtn: document.getElementById("copyMarkdownBtn"),
+        copyBuffer: document.getElementById("copyBuffer"),
+      };
+
+      function updateUrlParams({ pkg, isDev, limit }) {
+        const url = new URL(window.location);
+
+        if (pkg === "") {
+          url.searchParams.delete("package");
+        } else if (pkg) {
+          url.searchParams.set("package", pkg);
+        }
+
+        if (isDev === false) {
+          url.searchParams.delete("dev");
+        } else if (isDev) {
+          url.searchParams.set("dev", "true");
+        }
+
+        if (limit === "" || limit === "200") {
+          url.searchParams.delete("limit");
+        } else if (limit) {
+          url.searchParams.set("limit", limit);
+        }
+
+        window.history.pushState({}, "", url);
+      }
+
+      function loadParamsFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const pkg = params.get("package");
+        const dev = params.get("dev");
+        const limit = params.get("limit");
+
+        if (pkg) {
+          elements.pkgInput.value = pkg;
+        }
+        if (dev === "true") {
+          elements.devCheckbox.checked = true;
+        }
+        if (limit) {
+          elements.limitInput.value = limit;
+        }
+
+        if (pkg) {
+          startAnalysis();
+        }
+      }
+
+      const reg = /[|`\\_]/g;
+      function escapeMdTable(str, ...values) {
+        return String.raw(
+          { raw: str },
+          ...values.map((v) => v.replace(reg, "\\$&")),
+        );
+      }
+
+      function formatDownloads(downloads) {
+        if (downloads >= 1e9) return `${(downloads / 1e9).toFixed(2)}B`;
+        if (downloads >= 1e6) return `${(downloads / 1e6).toFixed(2)}M`;
+        if (downloads >= 1e3) return `${(downloads / 1e3).toFixed(2)}k`;
+        return downloads.toString();
+      }
+
+      function formatTraffic(bytes) {
+        if (bytes >= 1e15) return `${(bytes / 1e15).toFixed(2)} PB`;
+        if (bytes >= 1e12) return `${(bytes / 1e12).toFixed(2)} TB`;
+        if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`;
+        if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(2)} MB`;
+        if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(2)} KB`;
+        return `${bytes} bytes`;
+      }
+
+      function getPackageNameAndVersion(input) {
+        const scoped = input.startsWith("@");
+        let [packageName, version] = input.split("@");
+        if (scoped) {
+          const atPos = input.lastIndexOf("@");
+          if (atPos === 0) {
+            packageName = input;
+            version = undefined;
+          } else {
+            packageName = input.slice(0, atPos);
+            version = input.slice(atPos + 1);
+          }
+        }
+        return [packageName, version];
+      }
+
+      // --- Fetching Logic ---
+      async function fetchPackageInfo(packageName, version = "latest") {
+        const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return null;
+          return await res.json();
+        } catch {
+          return null;
+        }
+      }
+
+      async function fetchDependents(packageName, dev = false) {
+        const view = dev ? "dev-dependencies" : "dependents2";
+        const url = `${registryUrl}/_design/dependents/_view/${view}?key="${packageName}"`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+          const data = await res.json();
+
+          if (data.rows.length && typeof data.rows[0].value === "string") {
+            return data.rows.map((p) => ({
+              ...p,
+              value: { name: p.id, version: "" },
+            }));
+          }
+          return data.rows;
+        } catch {
+          return [];
+        }
+      }
+
+      async function fetchDownloadStats(packageNames) {
+        if (packageNames.length === 0) return {};
+        try {
+          const res = await fetch(
+            `${registryUrl}/_design/downloads/_view/downloads`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ keys: packageNames }),
+            },
+          );
+          const data = await res.json();
+          return Object.fromEntries(data.rows.map((r) => [r.key, r.value]));
+        } catch {
+          return {};
+        }
+      }
+
+      // --- Core Logic ---
+      async function startAnalysis() {
+        const pkgNameInput = elements.pkgInput.value.trim();
+        if (!pkgNameInput) return;
+
+        updateUrlParams({
+          pkg: pkgNameInput,
+          limit: elements.limitInput.value,
+        });
+
+        setLoading(true);
+        updateProgress(10, "Fetching package info...");
+
+        try {
+          const [pkgName, requestedVersion] =
+            getPackageNameAndVersion(pkgNameInput);
+          const packageInfo = await fetchPackageInfo(pkgName, requestedVersion);
+
+          if (!packageInfo) {
+            throw new Error(`Failed to fetch package info for ${pkgName}`);
+          }
+
+          currentPackageSize = packageInfo.dist?.size ?? 0;
+          const actualVersion = packageInfo.version;
+
+          updateProgress(
+            30,
+            `Searching for ${elements.devCheckbox.checked ? "dev" : ""} dependents...`,
+          );
+          const allDependents = await fetchDependents(
+            pkgName,
+            elements.devCheckbox.checked,
+          );
+
+          const filteredDeps = allDependents.filter((dependent) => {
+            return (
+              !requestedVersion ||
+              semver.satisfies(actualVersion, dependent.value.version)
+            );
+          });
+
+          if (filteredDeps.length === 0) {
+            showError("No dependents found satisfying the version range.");
+            setLoading(false);
+            return;
+          }
+
+          updateProgress(60, "Retrieving download statistics...");
+          const depNames = filteredDeps.map((d) => d.value.name);
+          const downloadStats = await fetchDownloadStats(depNames);
+
+          const results = filteredDeps.map((dep) => {
+            const downloads = downloadStats[dep.value.name] ?? 0;
+            const traffic = downloads * currentPackageSize;
+            return {
+              name: dep.value.name,
+              version: dep.value.version,
+              downloads,
+              traffic,
+            };
+          });
+
+          results.sort((a, b) => b.downloads - a.downloads);
+
+          const limit = parseInt(elements.limitInput.value) || 200;
+          currentResults = results.slice(0, limit);
+
+          updateProgress(100, "Analysis complete.");
+          displayResults(currentResults, elements.devCheckbox.checked);
+        } catch (err) {
+          showError(err.message);
+        } finally {
+          setTimeout(() => setLoading(false), 500);
+        }
+      }
+
+      function displayResults(data, isDev) {
+        elements.resultsTableBody.innerHTML = "";
+
+        elements.trafficHeader.classList.toggle("hidden", isDev);
+        elements.versionHeader.classList.toggle("hidden", isDev);
+
+        elements.resultsArea.classList.remove("hidden");
+        elements.emptyState.classList.add("hidden");
+
+        elements.totalStats.textContent = `Showing ${data.length} packages`;
+
+        data.forEach((pkg, i) => {
+          const row = document.createElement("tr");
+          row.className = "hover:bg-slate-50 transition-colors";
+
+          const trafficCell = isDev
+            ? ""
+            : `<td class="px-6 py-4 font-mono text-slate-500">${formatTraffic(pkg.traffic)}</td>`;
+          const versionCell = isDev
+            ? ""
+            : `<td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">${pkg.version || "any"}</span></td>`;
+
+          row.innerHTML = `
+              <td class="px-6 py-4 text-slate-400 font-medium">${i + 1}</td>
+              <td class="px-6 py-4 font-bold text-slate-700">${formatDownloads(pkg.downloads)}</td>
+              ${trafficCell}
+              ${versionCell}
+              <td class="px-6 py-4">
+                  <a href="https://npmx.dev/${pkg.name}" target="_blank" class="text-blue-600 hover:underline font-medium">
+                      ${pkg.name}
+                  </a>
+              </td>
+            `;
+          elements.resultsTableBody.appendChild(row);
+        });
+      }
+
+      function copyMarkdown() {
+        if (!currentResults.length) return;
+
+        const isDev = elements.devCheckbox.checked;
+        let md = "";
+
+        if (!isDev) {
+          md += `| # | Downloads/month | Traffic | Version | Package |\n`;
+          md += `|---|-----------------|---------|---------|---------|\n`;
+        } else {
+          md += `| # | Downloads/month | Package |\n`;
+          md += `|---|-----------------|---------|\n`;
+        }
+
+        currentResults.forEach((pkg, i) => {
+          const indexStr = `${i + 1}`;
+          const downloadsStr = formatDownloads(pkg.downloads);
+          const trafficStr = formatTraffic(pkg.traffic);
+          const versionStr = pkg.version || "any";
+          const pkgLink = `[${pkg.name}](https://npmx.dev/${pkg.name})`;
+
+          if (!isDev) {
+            md += escapeMdTable`| ${indexStr} | ${downloadsStr} | ${trafficStr} | ${versionStr} | ${pkgLink} |\n`;
+          } else {
+            md += escapeMdTable`| ${indexStr} | ${downloadsStr} | ${pkgLink} |\n`;
+          }
+        });
+
+        elements.copyBuffer.value = md;
+        elements.copyBuffer.select();
+        document.execCommand("copy");
+
+        const btn = elements.copyMarkdownBtn;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "<span>Copied!</span>";
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+        }, 2000);
+      }
+
+      // --- UI State Helpers ---
+      function setLoading(val) {
+        isLoading = val;
+        elements.searchBtn.disabled = val;
+        elements.searchIcon.classList.toggle("hidden", val);
+        elements.loadingIcon.classList.toggle("hidden", !val);
+        elements.progressIndicator.classList.toggle("hidden", !val);
+        if (val) {
+          elements.errorBox.classList.add("hidden");
+        }
+      }
+
+      function updateProgress(percent, status) {
+        elements.progressBar.style.width = `${percent}%`;
+        elements.percentLabel.textContent = `${percent}%`;
+        elements.statusLabel.textContent = status;
+      }
+
+      function showError(msg) {
+        elements.errorBox.textContent = msg;
+        elements.errorBox.classList.remove("hidden");
+        elements.resultsArea.classList.add("hidden");
+        elements.emptyState.classList.remove("hidden");
+      }
+
+      // --- Event Listeners ---
+      elements.searchBtn.addEventListener("click", startAnalysis);
+      elements.pkgInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") startAnalysis();
+      });
+      elements.limitInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") startAnalysis();
+      });
+      elements.devCheckbox.addEventListener("change", () => {
+        updateUrlParams({ isDev: elements.devCheckbox.checked });
+      });
+      elements.copyMarkdownBtn.addEventListener("click", copyMarkdown);
+
+      window.addEventListener("popstate", loadParamsFromUrl);
+      window.addEventListener("DOMContentLoaded", loadParamsFromUrl);
+    </script>
+  </body>
+</html>
