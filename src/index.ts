@@ -62,7 +62,8 @@ if (!argv) {
 }
 
 const npmRegistryBaseUrl = "https://registry.npmmirror.com";
-const registryUrl = "https://npm.devminer.xyz/live_registry";
+const registryUrl = "https://npm.devminer.xyz/registry";
+const liveRegistryUrl = "https://npm.devminer.xyz/live_registry";
 
 interface NpmPackageInfo {
   name: string;
@@ -188,7 +189,7 @@ async function fetchDownloadStats(packageNames: string[]) {
   };
 
   const response = await fetchWithProgress<Stats>(
-    `${registryUrl}/_design/downloads/_view/downloads`,
+    `${liveRegistryUrl}/_design/downloads/_view/downloads`,
     {
       method: "POST",
       headers: {
@@ -328,7 +329,6 @@ async function main(inputPackage: string, depths = 0) {
   const dependents = dependentsWithVersion.filter((dependent) => {
     return (
       // Dont filter when no version was given
-      !version || Bun.semver.satisfies(actualVersion, dependent.value.version)
     );
   });
 
