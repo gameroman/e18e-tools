@@ -66,7 +66,7 @@
           <div>
             <label
               class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
-              >Limit Results (max 2000)</label
+              >Limit Results (max 3000)</label
             >
             <input
               type="number"
@@ -410,20 +410,17 @@
         return result.data.dist?.size || 0;
       }
 
-      const MAX_DEPENDENTS = 2000;
-
       async function fetchAllStats(names) {
         let combinedStats = {};
-        const limit = names.slice(0, MAX_DEPENDENTS);
 
-        updateProgress(40, `Fetching stats for ${limit.length} packages...`);
+        updateProgress(40, `Fetching stats for ${names.length} packages...`);
 
         const { data } = await cachedFetch(
           `${registryUrl}/_design/downloads/_view/downloads`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ keys: limit }),
+            body: JSON.stringify({ keys: names }),
           },
         );
 
@@ -445,6 +442,8 @@
 
         const allNames = data.rows.map((r) => r.id);
         const allStats = await fetchAllStats(allNames);
+
+        const MAX_DEPENDENTS = 3000;
 
         const processed = data.rows
           .map((r) => ({

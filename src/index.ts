@@ -329,6 +329,7 @@ async function main(inputPackage: string, depths = 0) {
   const dependents = dependentsWithVersion.filter((dependent) => {
     return (
       // Dont filter when no version was given
+      !version || Bun.semver.satisfies(actualVersion, dependent.value.version)
     );
   });
 
