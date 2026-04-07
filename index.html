@@ -66,7 +66,7 @@
           <div>
             <label
               class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
-              >Limit Results</label
+              >Limit Results (max 2000)</label
             >
             <input
               type="number"
@@ -401,7 +401,6 @@
       async function fetchPackageInfo(packageName, version = "latest") {
         const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
         return await cachedFetch(url, {
-          // Store only the primitive values
           map: (res) => ({ v: res.version, s: res.dist?.size || 0 }),
         });
       }
@@ -409,12 +408,12 @@
       async function fetchDependents(packageName, dev = false) {
         const view = dev ? "dev-dependencies" : "dependents2";
         const url = `${liveRegistryUrl}/_design/dependents/_view/${view}?key="${packageName}"`;
-
+        const cacheBuffer = 2000;
         return await cachedFetch(url, {
           map: (res) =>
-            res.rows.map(
-              (r) => `${r.value?.name || r.id}@${r.value?.version || ""}`,
-            ),
+            res.rows
+              .slice(0, cacheBuffer)
+              .map((r) => `${r.value?.name || r.id}@${r.value?.version || ""}`),
         });
       }
 
