@@ -273,15 +273,22 @@
         copyBuffer: document.getElementById("copyBuffer"),
       };
 
+      const hash = (str) => {
+        let h = 5381;
+        let i = str.length;
+        while (i) h = (h * 33) ^ str.charCodeAt(--i);
+        return (h >>> 0).toString(36);
+      };
+
       async function cachedFetch(url, options = {}) {
-        const cacheKey = `cache:fetch:${url}:${JSON.stringify(options.body || "")}`;
+        const payload = `${url}${options.body ?? ""}`;
+        const cacheKey = `fetch:${hash(payload)}`;
+
         const cached = localStorage.getItem(cacheKey);
 
         if (cached) {
           const { data, expiry } = JSON.parse(cached);
-          if (Date.now() < expiry) {
-            return data;
-          }
+          if (Date.now() < expiry) return data;
           localStorage.removeItem(cacheKey);
         }
 
@@ -289,8 +296,6 @@
         if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
 
         const rawData = await response.json();
-
-        // Transform the data using the map function before saving
         const dataToStore = options.map ? options.map(rawData) : rawData;
 
         const expiry = Date.now() + (options.ttl ?? 10) * 60 * 1000;
@@ -298,10 +303,9 @@
 
         try {
           localStorage.setItem(cacheKey, JSON.stringify(cacheEntry));
-        } catch {
-          console.warn("LocalStorage full, clearing fetch cache...");
+        } catch (err) {
           Object.keys(localStorage)
-            .filter((k) => k.startsWith("cache:fetch:"))
+            .filter((k) => k.startsWith("fetch:"))
             .forEach((k) => localStorage.removeItem(k));
         }
 
@@ -394,13 +398,10 @@
       }
 
       // --- Fetching Logic ---
-      async function fetchPackageInfo(packageName, version = "latest") {
-        const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
+      async function fetchPackageInfo(packageName) {
         return await cachedFetch(url, {
-          map: (res) => ({
-            version: res.version,
-            dist: { size: res.dist?.size || 0 },
-          }),
+          // Store only the primitive values
+          map: (res) => ({ v: res.version, s: res.dist?.size || 0 }),
         });
       }
 
@@ -410,12 +411,9 @@
 
         return await cachedFetch(url, {
           map: (res) =>
-            res.rows.map((r) => ({
-              value: {
-                name: r.value?.name || r.id,
-                version: r.value?.version || "",
-              },
-            })),
+            res.rows.map(
+              (r) => `${r.value?.name || r.id}@${r.value?.version || ""}`,
+            ),
         });
       }
 
@@ -428,7 +426,6 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ keys: packageNames }),
-            // Map the array of rows directly into a simple lookup object
             map: (res) =>
               Object.fromEntries(res.rows.map((r) => [r.key, r.value])),
           },
@@ -457,8 +454,8 @@
             throw new Error(`Failed to fetch package info for ${pkgName}`);
           }
 
-          currentPackageSize = packageInfo.dist?.size ?? 0;
-          const actualVersion = packageInfo.version;
+          currentPackageSize = packageInfo.s ?? 0;
+          const actualVersion = packageInfo.v;
 
           updateProgress(
             30,
@@ -469,11 +466,10 @@
             elements.devCheckbox.checked,
           );
 
-          const filteredDeps = allDependents.filter((dependent) => {
-            return (
-              !requestedVersion ||
-              semver.satisfies(actualVersion, dependent.value.version)
-            );
+          const filteredDeps = allDependents.filter((depString) => {
+            if (!requestedVersion) return true;
+            const [, depRange] = depString.split("@");
+            return semver.satisfies(actualVersion, depRange);
           });
 
           if (filteredDeps.length === 0) {
@@ -483,18 +479,15 @@
           }
 
           updateProgress(60, "Retrieving download statistics...");
-          const depNames = filteredDeps.map((d) => d.value.name);
+
+          const depNames = filteredDeps.map((d) => d.split("@")[0]);
           const downloadStats = await fetchDownloadStats(depNames);
 
-          const results = filteredDeps.map((dep) => {
-            const downloads = downloadStats[dep.value.name] ?? 0;
+          const results = filteredDeps.map((depString) => {
+            const [name, version] = depString.split("@");
+            const downloads = downloadStats[name] ?? 0;
             const traffic = downloads * currentPackageSize;
-            return {
-              name: dep.value.name,
-              version: dep.value.version,
-              downloads,
-              traffic,
-            };
+            return { name, version, downloads, traffic };
           });
 
           results.sort((a, b) => b.downloads - a.downloads);
