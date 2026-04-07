@@ -399,6 +399,7 @@
 
       // --- Fetching Logic ---
       async function fetchPackageInfo(packageName) {
+        const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
         return await cachedFetch(url, {
           // Store only the primitive values
           map: (res) => ({ v: res.version, s: res.dist?.size || 0 }),
