@@ -392,10 +392,10 @@
       async function fetchPackageInfo(packageName, version = "latest") {
         const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
         try {
-          const res = await cachedFetch(url);
-          if (!res.ok) return null;
-          return await res.json();
-        } catch {
+          const data = await cachedFetch(url);
+          return data;
+        } catch (e) {
+          console.error(e);
           return null;
         }
       }
@@ -404,9 +404,7 @@
         const view = dev ? "dev-dependencies" : "dependents2";
         const url = `${liveRegistryUrl}/_design/dependents/_view/${view}?key="${packageName}"`;
         try {
-          const res = await cachedFetch(url);
-          if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-          const data = await res.json();
+          const data = await cachedFetch(url);
 
           if (data.rows.length && typeof data.rows[0].value === "string") {
             return data.rows.map((p) => ({
@@ -423,7 +421,7 @@
       async function fetchDownloadStats(packageNames) {
         if (packageNames.length === 0) return {};
         try {
-          const res = await cachedFetch(
+          const data = await cachedFetch(
             `${registryUrl}/_design/downloads/_view/downloads`,
             {
               method: "POST",
@@ -431,7 +429,6 @@
               body: JSON.stringify({ keys: packageNames }),
             },
           );
-          const data = await res.json();
           return Object.fromEntries(data.rows.map((r) => [r.key, r.value]));
         } catch {
           return {};
