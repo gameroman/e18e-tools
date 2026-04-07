@@ -66,7 +66,7 @@
           <div>
             <label
               class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
-              >Limit Results (max 2000)</label
+              >Limit Results (max 5000)</label
             >
             <input
               type="number"
@@ -281,35 +281,37 @@
       };
 
       async function cachedFetch(url, options = {}) {
-        const payload = `${url}${options.body ?? ""}`;
-        const cacheKey = `fetch:${hash(payload)}`;
-
-        const cached = localStorage.getItem(cacheKey);
+        const hashKey = `fetch:${hash(url + (options.body || ""))}`;
+        const cached = localStorage.getItem(hashKey);
 
         if (cached) {
           const { data, expiry } = JSON.parse(cached);
-          if (Date.now() < expiry) return data;
-          localStorage.removeItem(cacheKey);
+          if (Date.now() < expiry) return { data, isCached: true };
+          localStorage.removeItem(hashKey);
         }
 
         const response = await fetch(url, options);
         if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-
         const rawData = await response.json();
-        const dataToStore = options.map ? options.map(rawData) : rawData;
 
-        const expiry = Date.now() + (options.ttl ?? 10) * 60 * 1000;
-        const cacheEntry = { data: dataToStore, expiry };
-
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify(cacheEntry));
-        } catch (err) {
-          Object.keys(localStorage)
-            .filter((k) => k.startsWith("fetch:"))
-            .forEach((k) => localStorage.removeItem(k));
-        }
-
-        return dataToStore;
+        return {
+          data: rawData,
+          isCached: false,
+          commit(processedData, ttlMinutes = 10) {
+            try {
+              const entry = {
+                data: processedData,
+                expiry: Date.now() + ttlMinutes * 60 * 1000,
+              };
+              localStorage.setItem(hashKey, JSON.stringify(entry));
+            } catch (err) {
+              console.error(err);
+              Object.keys(localStorage)
+                .filter((k) => k.startsWith("fetch:"))
+                .forEach((k) => localStorage.removeItem(k));
+            }
+          },
+        };
       }
 
       function updateUrlParams({ pkg, isDev, limit }) {
@@ -398,109 +400,109 @@
       }
 
       // --- Fetching Logic ---
-      async function fetchPackageInfo(packageName, version = "latest") {
-        const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
-        return await cachedFetch(url, {
-          map: (res) => ({ v: res.version, s: res.dist?.size || 0 }),
-        });
-      }
-
-      async function fetchDependents(packageName, dev = false) {
-        const view = dev ? "dev-dependencies" : "dependents2";
-        const url = `${liveRegistryUrl}/_design/dependents/_view/${view}?key="${packageName}"`;
-        const cacheBuffer = 2000;
-        return await cachedFetch(url, {
-          map: (res) =>
-            res.rows
-              .slice(0, cacheBuffer)
-              .map((r) => `${r.value?.name || r.id}@${r.value?.version || ""}`),
-        });
-      }
-
-      async function fetchDownloadStats(packageNames) {
-        if (packageNames.length === 0) return {};
-
-        return await cachedFetch(
-          `${registryUrl}/_design/downloads/_view/downloads`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ keys: packageNames }),
-            map: (res) =>
-              Object.fromEntries(res.rows.map((r) => [r.key, r.value])),
-          },
+      async function getBasePackageSize(name) {
+        const result = await cachedFetch(
+          `${npmRegistryBaseUrl}/${name}/latest`,
         );
+        if (!result.isCached) {
+          result.commit(result.data);
+        }
+        return result.data.dist?.size || 0;
+      }
+
+      const MAX_DEPENDENTS = 5000;
+
+      async function fetchAllStatsInChunks(names) {
+        const CHUNK_SIZE = 1000;
+        let combinedStats = {};
+        const limit = Math.min(names.length, MAX_DEPENDENTS);
+
+        for (let i = 0; i <= limit; i += CHUNK_SIZE) {
+          const chunk = names.slice(i, i + CHUNK_SIZE);
+
+          const { data } = await cachedFetch(
+            `${registryUrl}/_design/downloads/_view/downloads`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ keys: chunk }),
+            },
+          );
+
+          data.rows.forEach((r) => (combinedStats[r.key] = r.value));
+
+          const progress = 40 + Math.floor((i / limit) * 50);
+          updateProgress(progress, `Fetching stats: ${i} / ${limit}`);
+        }
+        return combinedStats;
+      }
+
+      async function getSortedDependents(packageName, isDev) {
+        const view = isDev ? "dev-dependencies" : "dependents2";
+        const url = `${liveRegistryUrl}/_design/dependents/_view/${view}?key="${packageName}"`;
+
+        const { data, isCached, commit } = await cachedFetch(url);
+
+        if (isCached) return data;
+
+        updateProgress(30, "Analyzing dependent list...");
+
+        const allNames = data.rows.map((r) => r.id);
+        const allStats = await fetchAllStatsInChunks(allNames);
+
+        const processed = data.rows
+          .map((r) => ({
+            n: r.id,
+            v: r.value?.version || "",
+            d: allStats[r.id] || 0,
+          }))
+          .sort((a, b) => b.d - a.d)
+          .slice(0, MAX_DEPENDENTS);
+
+        commit(processed);
+
+        return processed;
       }
 
       // --- Core Logic ---
       async function startAnalysis() {
-        const pkgNameInput = elements.pkgInput.value.trim();
-        if (!pkgNameInput) return;
-
-        updateUrlParams({
-          pkg: pkgNameInput,
-          limit: elements.limitInput.value,
-        });
+        const pkgInput = elements.pkgInput.value.trim();
+        if (!pkgInput) return;
 
         setLoading(true);
-        updateProgress(10, "Fetching package info...");
+        updateProgress(10, "Initializing...");
 
         try {
-          const [pkgName, requestedVersion] =
-            getPackageNameAndVersion(pkgNameInput);
-          const packageInfo = await fetchPackageInfo(pkgName, requestedVersion);
-
-          if (!packageInfo) {
-            throw new Error(`Failed to fetch package info for ${pkgName}`);
-          }
-
-          currentPackageSize = packageInfo.s ?? 0;
-          const actualVersion = packageInfo.v;
-
-          updateProgress(
-            30,
-            `Searching for ${elements.devCheckbox.checked ? "dev" : ""} dependents...`,
-          );
-          const allDependents = await fetchDependents(
-            pkgName,
-            elements.devCheckbox.checked,
-          );
-
-          const filteredDeps = allDependents.filter((depString) => {
-            if (!requestedVersion) return true;
-            const [, depRange] = depString.split("@");
-            return semver.satisfies(actualVersion, depRange);
-          });
-
-          if (filteredDeps.length === 0) {
-            showError("No dependents found satisfying the version range.");
-            setLoading(false);
-            return;
-          }
-
-          updateProgress(60, "Retrieving download statistics...");
-
-          const depNames = filteredDeps.map((d) => d.split("@")[0]);
-          const downloadStats = await fetchDownloadStats(depNames);
-
-          const results = filteredDeps.map((depString) => {
-            const [name, version] = depString.split("@");
-            const downloads = downloadStats[name] ?? 0;
-            const traffic = downloads * currentPackageSize;
-            return { name, version, downloads, traffic };
-          });
-
-          results.sort((a, b) => b.downloads - a.downloads);
-
+          const [pkgName, requestedRange] = getPackageNameAndVersion(pkgInput);
+          const isDev = elements.devCheckbox.checked;
           const limit = parseInt(elements.limitInput.value) || 200;
-          currentResults = results.slice(0, limit);
 
-          updateProgress(100, "Analysis complete.");
-          displayResults(currentResults, elements.devCheckbox.checked);
+          updateUrlParams({ pkg: pkgInput, isDev, limit: limit.toString() });
+          updateProgress(20, "Fetching package metadata...");
+          const pkgSize = await getBasePackageSize(pkgName);
+          const sortedDeps = await getSortedDependents(pkgName, isDev);
+          updateProgress(95, "Calculating traffic and versions...");
+
+          currentResults = sortedDeps
+            .filter((d) => {
+              if (!requestedRange) return true;
+              return semver.satisfies(d.v, requestedRange);
+            })
+            .map((d) => ({
+              name: d.n,
+              version: d.v,
+              downloads: d.d,
+              traffic: d.d * pkgSize,
+            }))
+            .slice(0, limit);
+
+          displayResults(currentResults, isDev);
+          updateProgress(100, "Analysis complete");
         } catch (err) {
+          console.error(err);
           showError(err.message);
         } finally {
-          setTimeout(() => setLoading(false), 500);
+          setLoading(false);
         }
       }
 
