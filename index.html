@@ -273,6 +273,36 @@
         copyBuffer: document.getElementById("copyBuffer"),
       };
 
+      async function cachedFetch(url, options = {}) {
+        const cacheKey = `cache:fetch:${url}:${JSON.stringify(options.body || "")}`;
+        const cached = localStorage.getItem(cacheKey);
+
+        if (cached) {
+          const { data, expiry } = JSON.parse(cached);
+          if (Date.now() < expiry) {
+            return data;
+          }
+          localStorage.removeItem(cacheKey); // Clean up expired
+        }
+
+        const response = await fetch(url, options);
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+
+        const data = await response.json();
+        const expiry = Date.now() + (options.ttl ?? 10) * 60 * 1000;
+        const cacheEntry = { data, expiry };
+
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(cacheEntry));
+        } catch {
+          // Handle QuotaExceededError (local storage full)
+          console.warn("LocalStorage full, clearing and retrying...");
+          localStorage.clear();
+        }
+
+        return data;
+      }
+
       function updateUrlParams({ pkg, isDev, limit }) {
         const url = new URL(window.location);
 
@@ -362,7 +392,7 @@
       async function fetchPackageInfo(packageName, version = "latest") {
         const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
         try {
-          const res = await fetch(url);
+          const res = await cachedFetch(url);
           if (!res.ok) return null;
           return await res.json();
         } catch {
@@ -374,7 +404,7 @@
         const view = dev ? "dev-dependencies" : "dependents2";
         const url = `${liveRegistryUrl}/_design/dependents/_view/${view}?key="${packageName}"`;
         try {
-          const res = await fetch(url);
+          const res = await cachedFetch(url);
           if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
           const data = await res.json();
 
@@ -393,7 +423,7 @@
       async function fetchDownloadStats(packageNames) {
         if (packageNames.length === 0) return {};
         try {
-          const res = await fetch(
+          const res = await cachedFetch(
             `${registryUrl}/_design/downloads/_view/downloads`,
             {
               method: "POST",
