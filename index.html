@@ -282,25 +282,30 @@
           if (Date.now() < expiry) {
             return data;
           }
-          localStorage.removeItem(cacheKey); // Clean up expired
+          localStorage.removeItem(cacheKey);
         }
 
         const response = await fetch(url, options);
         if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
 
-        const data = await response.json();
+        const rawData = await response.json();
+
+        // Transform the data using the map function before saving
+        const dataToStore = options.map ? options.map(rawData) : rawData;
+
         const expiry = Date.now() + (options.ttl ?? 10) * 60 * 1000;
-        const cacheEntry = { data, expiry };
+        const cacheEntry = { data: dataToStore, expiry };
 
         try {
           localStorage.setItem(cacheKey, JSON.stringify(cacheEntry));
         } catch {
-          // Handle QuotaExceededError (local storage full)
-          console.warn("LocalStorage full, clearing and retrying...");
-          localStorage.clear();
+          console.warn("LocalStorage full, clearing fetch cache...");
+          Object.keys(localStorage)
+            .filter((k) => k.startsWith("cache:fetch:"))
+            .forEach((k) => localStorage.removeItem(k));
         }
 
-        return data;
+        return dataToStore;
       }
 
       function updateUrlParams({ pkg, isDev, limit }) {
@@ -391,48 +396,43 @@
       // --- Fetching Logic ---
       async function fetchPackageInfo(packageName, version = "latest") {
         const url = `${npmRegistryBaseUrl}/${packageName}/${version}`;
-        try {
-          const data = await cachedFetch(url);
-          return data;
-        } catch (e) {
-          console.error(e);
-          return null;
-        }
+        return await cachedFetch(url, {
+          map: (res) => ({
+            version: res.version,
+            dist: { size: res.dist?.size || 0 },
+          }),
+        });
       }
 
       async function fetchDependents(packageName, dev = false) {
         const view = dev ? "dev-dependencies" : "dependents2";
         const url = `${liveRegistryUrl}/_design/dependents/_view/${view}?key="${packageName}"`;
-        try {
-          const data = await cachedFetch(url);
 
-          if (data.rows.length && typeof data.rows[0].value === "string") {
-            return data.rows.map((p) => ({
-              ...p,
-              value: { name: p.id, version: "" },
-            }));
-          }
-          return data.rows;
-        } catch {
-          return [];
-        }
+        return await cachedFetch(url, {
+          map: (res) =>
+            res.rows.map((r) => ({
+              value: {
+                name: r.value?.name || r.id,
+                version: r.value?.version || "",
+              },
+            })),
+        });
       }
 
       async function fetchDownloadStats(packageNames) {
         if (packageNames.length === 0) return {};
-        try {
-          const data = await cachedFetch(
-            `${registryUrl}/_design/downloads/_view/downloads`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ keys: packageNames }),
-            },
-          );
-          return Object.fromEntries(data.rows.map((r) => [r.key, r.value]));
-        } catch {
-          return {};
-        }
+
+        return await cachedFetch(
+          `${registryUrl}/_design/downloads/_view/downloads`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keys: packageNames }),
+            // Map the array of rows directly into a simple lookup object
+            map: (res) =>
+              Object.fromEntries(res.rows.map((r) => [r.key, r.value])),
+          },
+        );
       }
 
       // --- Core Logic ---
